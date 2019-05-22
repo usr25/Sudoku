@@ -2,7 +2,6 @@ module Main where
 
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Data.Maybe (fromJust)
-import Data.List (splitAt)
 
 import Data.Bits
 import Data.Array.Unboxed
@@ -10,15 +9,15 @@ import Data.Array.Unboxed
 import Sudoku
 
 vals_easy = 
-    [[0, 0, 3,  0, 2, 9,  6, 0, 8],
-     [6, 0, 0,  8, 0, 0,  0, 9, 0],
-     [0, 9, 5,  4, 0, 6,  0, 0, 7],
-     [1, 6, 0,  9, 3, 0,  8, 0, 4],
-     [4, 0, 7,  0, 8, 0,  9, 0, 6],
-     [9, 0, 8,  0, 4, 2,  0, 0, 0],
-     [3, 0, 0,  2, 0, 4,  0, 6, 0],
-     [0, 7, 0,  0, 0, 1,  0, 0, 5],
-     [5, 0, 9,  7, 6, 0,  3, 1, 2]]
+        [[0, 0, 3,  0, 2, 9,  6, 0, 8],
+         [6, 0, 0,  8, 0, 0,  0, 9, 0],
+         [0, 9, 5,  4, 0, 6,  0, 0, 7],
+         [1, 6, 0,  9, 3, 0,  8, 0, 4],
+         [4, 0, 7,  0, 8, 0,  9, 0, 6],
+         [9, 0, 8,  0, 4, 2,  0, 0, 0],
+         [3, 0, 0,  2, 0, 4,  0, 6, 0],
+         [0, 7, 0,  0, 0, 1,  0, 0, 5],
+         [5, 0, 9,  7, 6, 0,  3, 1, 2]]
 
 vals_tree = 
         [[0, 0, 3,  0, 2, 9,  6, 0, 8],
@@ -42,85 +41,50 @@ vals_final =
         [0, 0, 0,  2, 0, 0,  3, 0, 0],
         [1, 0, 0,  0, 0, 0,  0, 0, 0]]
 
+vals_impossible = --It should return sudokuEMPTY and False when checked with isValid
+        [[0, 2, 3,  4, 5, 6,  7, 8, 9], 
+        [0, 0, 0,  0, 0, 7,  1, 0, 0],
+        [0, 9, 0,  0, 0, 0,  0, 0, 0],
+        [0, 0, 0,  0, 0, 0,  0, 8, 4],
+        [0, 0, 0,  0, 7, 5,  0, 0, 0],
+        [6, 0, 0,  0, 3, 0,  0, 0, 0],
+        [0, 3, 5,  4, 6, 7,  8, 2, 9],
+        [0, 0, 0,  2, 0, 0,  3, 0, 0],
+        [0, 0, 0,  0, 0, 0,  0, 0, 0]]
 
 
 solve :: Sudoku -> Sudoku
-solve (Sudoku vals rows cols sqrs) = if somethingChanged then solve regenerate else regenerate
+solve sud = if somethingChanged then solve generateNext else generateNext
     where
-        (next, somethingChanged) = setAllPossibleB vals rows cols sqrs 0
-        regenerate = genSudokuFromPrev next
+        (next, rest, somethingChanged) = setAllPossible sud
+        generateNext = genSudokuFromPrev next rest
 
-
-setAllPossible :: [[Value]] -> UArray Int Value -> UArray Int Value -> UArray Int Value -> Int -> [[Value]]
-setAllPossible (v:vs) rows cols sqrs rowCounter = sr : setAllPossible vs rows cols sqrs (rowCounter+1)
+setAllPossible :: Sudoku -> ([[Value]], [(Int, Int)], Bool)
+setAllPossible (Sudoku vs rest rows cols sqrs) = (updateVs vs totalChanges 0, finalRemeaning, not (null totalChanges)) 
     where
-        sr = setAllPossibleRow v rowCounter 0
-
-        setAllPossibleRow :: [Value] -> Int -> Int -> [Value]
-        setAllPossibleRow (0:vs) rowCounter colCounter = if isPow2 value then value : next else 0 : next
+        helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)])
+        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs = if popCount possible == 1 then ((rowCounter, colCounter, possible):changed', newRem') else (changed, tup:newRem) 
             where
-                value = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
-                next = setAllPossibleRow vs rowCounter (colCounter+1)
-
-        setAllPossibleRow (v:vs) rowCounter colCounter = v : setAllPossibleRow vs rowCounter (colCounter+1)
-        setAllPossibleRow _ _ _ = []
-
-setAllPossible _ _ _ _ _ = []
-
-setAllPossibleB :: [[Value]] -> UArray Int Value -> UArray Int Value -> UArray Int Value -> Int -> ([[Value]], Bool)
-setAllPossibleB (v:vs) rows cols sqrs rowCounter = if somethingChangedNow then (sr : faster, True) else (sr : next, somethingChangedFollowing)
-    where
-        (next, somethingChangedFollowing) = setAllPossibleB vs rows cols sqrs (rowCounter+1)
-        (sr, somethingChangedNow) = setAllPossibleRowB v rowCounter 0
-        faster = setAllPossible vs rows cols sqrs (rowCounter+1)
-
-        setAllPossibleRowB :: [Value] -> Int -> Int -> ([Value], Bool)
-        setAllPossibleRowB (0:vs) rowCounter colCounter = if isPow2 value then (value : next, True) else (0 : next, b)
-            where
-                (next, b) = setAllPossibleRowB vs rowCounter (colCounter+1)
-                value = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
-
-        setAllPossibleRowB (v:vs) rowCounter colCounter = (v : next, b)
-            where
-                (next, b) = setAllPossibleRowB vs rowCounter (colCounter+1)
-
-        setAllPossibleRowB _ _ _ = ([], False)
-
-setAllPossibleB _ _ _ _ _ = ([], False)
-
+                possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+                (changed, newRem) =  helper rest rows cols sqrs
+                (changed', newRem') =  helper rest newR newC newS
+                (newR, newC, newS) = updateRowsColsSqrs (xor constALL possible) rowCounter colCounter rows cols sqrs
+        helper _ _ _ _ = ([], [])
+    
+        (totalChanges, finalRemeaning) = helper rest rows cols sqrs
 
 canBeFinished :: Sudoku -> Bool
-canBeFinished (Sudoku vs rows cols sqrs) = helper vs 0
+canBeFinished (Sudoku _ rest rows cols sqrs) = helper rest
     where
-        helper (v:vs) rowCounter = helper' v rowCounter 0 && helper vs (rowCounter+1)
-        helper _ _ = True
-
-        helper' (0:vs) rowCounter colCounter = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter)) /= 0 && next
-            where
-                next = helper' vs rowCounter (colCounter+1)
-        helper'(_:vs) rowCounter colCounter = next
-            where
-                next = helper' vs rowCounter (colCounter+1)
-        helper' _ _ _ = True
-
+        helper :: [(Int, Int)] -> Bool
+        helper ((rowCounter, colCounter):rems) = if and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter)) == 0 then False else helper rems
+        helper _ = True
 
 getNextVal :: Value -> Int -> Value
 getNextVal val c = if ((.&.) val c) == c then c else getNextVal val (shift c 1)
 
 
-findFirstZero :: [[Value]] -> UArray Int Value -> UArray Int Value -> UArray Int Value -> Int -> (Int, Int, Value)
-findFirstZero (v:vs) rows cols sqrs rowCounter = if calc == Nothing then findFirstZero vs rows cols sqrs (rowCounter+1) else fromJust calc 
-    where
-        helper :: [Value] -> Int -> Maybe (Int, Int, Value)
-        helper (0:vss) colCounter = Just (rowCounter, colCounter, andAll)
-            where
-                andAll = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
-        helper (_:vss) colCounter = helper vss (colCounter+1)
-        helper _ _ = Nothing 
-        
-        calc = helper v 0
-
-
+--Generates a list with all the possible values in a tile
 trySudokus :: Sudoku -> Int -> Int -> Value -> [Sudoku]
 trySudokus _ _ _ 0 = []
 trySudokus sud rowCounter colCounter val = result : trySudokus sud rowCounter colCounter (xor val getVal)
@@ -128,7 +92,7 @@ trySudokus sud rowCounter colCounter val = result : trySudokus sud rowCounter co
         result = genSudokuOneChange sud getVal rowCounter colCounter
         getVal = getNextVal val 1
 
-
+--Performs a DFS on the possible sudokus, until a valid one is found
 fall :: [Sudoku] -> (Sudoku, Bool)
 fall (sudo:sudos) = if pos then (res, True) else fall sudos
     where
@@ -137,15 +101,22 @@ fall _ = (sudokuEMPTY, False)
 
 
 solveRecursively :: Sudoku -> (Sudoku, Bool)
-solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) else if isFinished setAll then (setAll, isValid setAll) else fall (trySudokus setAll rowCounter colCounter possible)
+solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) else if isFinished setAll then (setAll, True) else fall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
     where
-        setAll@(Sudoku vs rs cs ss) = solve sud
-        (rowCounter, colCounter, possible) = findFirstZero vs rs cs ss 0
+        setAll@(Sudoku vs rest rows cols sqrs) = solve sud
+        ((rowCounter, colCounter):newRem) = rest
+        possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
 
 
 main :: IO()
 main = do
+
+    let easy = fst $ solveRecursively $ genSudoku vals_easy
+    let tree = fst $ solveRecursively $ genSudoku vals_tree
     let r = fst $ solveRecursively $ genSudoku vals_final
+
+    print $ isValid $ easy
+    print $ isValid $ tree
 
     startBool <- getCurrentTime
     putStrLn $ toStr $ r
@@ -165,4 +136,4 @@ main = do
 5 6 7  4 1 3  8 2 9  
 4 8 9  2 5 6  3 7 1  
 1 3 2  7 8 9  4 5 6 
--}
+-} 

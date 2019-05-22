@@ -4,7 +4,7 @@ Sudoku-solving algorithm implemented in different languages to observe the diffe
 O(_n_ ^_m_) algorithm, where _n_ is the number of empty tiles and _m_ the possible values (In this case, [1, 9]). Sudokus are an NP-Complete problem.
 
 ### Use
-_Requires go, rustc, gcc, python2/3, and Cython. Other compilers may yield different results_
+_Requires go, rustc, gcc, python2/3, Cython and ghc. Other compilers may yield different results_
 
 
 Place the files in a directory "dir"
@@ -19,6 +19,8 @@ $ `python3 "dir/Python/sudoku.py" `
 
 $ `python2 "dir/Python/compiler.py"  #Requires Cython, check the official website`
 
+$ `ghc -O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
+ 
 
 ### Results
 (In my computer, solving the 17-clue sudoku which is hard coded, the proportions should stay the same)
@@ -28,7 +30,7 @@ $ `python2 "dir/Python/compiler.py"  #Requires Cython, check the official websit
   * **C**      -> 100ms, 100%
   * **Python** -> 9.8s, 9800%
   * **Cython** -> 1.2s, 1200%
-
+  * **Haskell**-> 11.7s, 11700%
 
 ### Algorithm
   Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues.
@@ -42,3 +44,7 @@ $ `python2 "dir/Python/compiler.py"  #Requires Cython, check the official websit
   3. If there are no remeaning empty tiles: END
 
   4. Else: Select a tile and, for each value, try to solve the sudoku by making a duplicates and assigning one of the possible values, goto (2.)
+
+
+### Notes
+  Haskell is generally faster than Python, however, solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy code). The Haskell implementation involves a lot of innecessary copying / writing
