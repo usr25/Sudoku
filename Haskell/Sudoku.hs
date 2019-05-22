@@ -2,12 +2,13 @@ module Sudoku where
 
 import Data.Char (chr)
 import Data.List (foldl', transpose)
-import qualified Data.Array.Unboxed as U
+
+import Data.Array.Unboxed
 import Data.Bits
 
 type Value = Int
 
-data Sudoku = Sudoku ![[Value]] ![Value] ![Value] !(U.UArray Int Value) deriving (Eq)
+data Sudoku = Sudoku ![[Value]] !(UArray Int Value) !(UArray Int Value) !(UArray Int Value) deriving (Eq)
 
 r :: Int
 s :: Int
@@ -18,7 +19,7 @@ r = 3
 s = 9
 aLL = (shift 1 s) - 1
 indices = [0..(s-1)]
-sudokuEMPTY = Sudoku [] [] [] (U.array (0, 0) [])
+sudokuEMPTY = Sudoku [] (array (0, 0) []) (array (0, 0) []) (array (0, 0) [])
 
 getSqrIndex :: Int -> Int -> Int
 getSqrIndex row col = r * (div row r) + (div col r)
@@ -85,32 +86,57 @@ genSudoku :: [[Value]] -> Sudoku
 genSudoku vals = Sudoku arrayPow2 newRows newCols newSqrs
     where
         arrayPow2 = map (map toPow2) vals
-        newRows = orRows arrayPow2
-        newCols = orCols arrayPow2
-        newSqrs = U.listArray (0,s) (orSqrs arrayPow2)
+        newRows = listArray (0,s-1) (orRows arrayPow2)
+        newCols = listArray (0,s-1) (orCols arrayPow2)
+        newSqrs = listArray (0,s-1) (orSqrs arrayPow2)
+
+genSudokuFromPrev :: [[Value]] -> Sudoku
+genSudokuFromPrev vals = Sudoku vals newRows newCols newSqrs
+    where
+        newRows = listArray (0,s-1) (orRows vals)
+        newCols = listArray (0,s-1) (orCols vals)
+        newSqrs = listArray (0,s-1) (orSqrs vals)
+
+
+genSudokuOneChange :: Sudoku -> Value -> Int -> Int -> Sudoku
+genSudokuOneChange (Sudoku oldVs oldR oldC oldS) newVal rowCount colCount = Sudoku newVs newR newC newS
+    where
+        valMask :: Value
+        valMask = xor aLL newVal
+        newVs = subIn oldVs rowCount colCount newVal
+        
+        newR = listArray (0,s-1) (bfR ++ ((.&.) prevR valMask):afR)
+        (bfR, prevR:afR) = splitAt rowCount (elems oldR)
+
+        newC = listArray (0,s-1) (bfC ++ ((.&.) prevC valMask):afC)
+        (bfC, prevC:afC) = splitAt colCount (elems oldC)
+
+        newS = listArray (0,s-1) (bfS ++ ((.&.) prevS valMask):afS)
+        (bfS, prevS:afS) = splitAt (getSqrIndex rowCount colCount) (elems oldS)
 
 and3 :: Value -> Value -> Value -> Value
 {-# INLINE and3 #-}
 and3 a b c = (.&.) a ((.&.) b c)
 
-genSudokuFromPrev :: [[Value]] -> Sudoku
-genSudokuFromPrev vals = Sudoku vals newRows newCols newSqrs
-    where
-        newRows = orRows vals
-        newCols = orCols vals
-        newSqrs = U.listArray (0,s-1) (orSqrs vals)
-
-
 sumRows :: [[Value]] -> Bool
+{-# INLINE sumRows #-}
 sumRows vs = all (==aLL) res && sum res == s * aLL
     where
         res = map (foldl (+) 0) vs
 
+subIn :: [[Value]] -> Int -> Int -> Value -> [[Value]]
+{-# INLINE subIn #-}
+subIn vs r c val = before ++ (bf ++ val : af) : after
+    where
+        (before, row:after) = splitAt r vs
+        (bf, _:af) = splitAt c row
 
 isValid :: Sudoku -> Bool
 {-# INLINE isValid #-} 
 isValid (Sudoku vs _ _ _) = sumRows vs && (sumRows . transpose) vs && sum ssqrs == (aLL * s)
     where
+    ssqrs :: [Value]
+    {-# INLINE ssqrs #-}
     ssqrs = sumSquares vs 
 
     sumSquares :: [[Value]] -> [Value]
