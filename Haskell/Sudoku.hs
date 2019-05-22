@@ -2,20 +2,23 @@ module Sudoku where
 
 import Data.Char (chr)
 import Data.List (foldl', transpose)
-import Data.Array.ST (STUArray)
+import qualified Data.Array.Unboxed as U
 import Data.Bits
 
 type Value = Int
 
-data Sudoku = Sudoku ![[Value]] ![Value] ![Value] ![Value] deriving (Eq)
+data Sudoku = Sudoku ![[Value]] ![Value] ![Value] !(U.UArray Int Value) deriving (Eq)
 
 r :: Int
 s :: Int
 aLL :: Int
+indices :: [Int]
 
 r = 3
 s = 9
 aLL = (shift 1 s) - 1
+indices = [0..(s-1)]
+sudokuEMPTY = Sudoku [] [] [] (U.array (0, 0) [])
 
 getSqrIndex :: Int -> Int -> Int
 getSqrIndex row col = r * (div row r) + (div col r)
@@ -63,7 +66,7 @@ andArray :: [Value] -> Value
 andArray = foldl' (.&.) aLL
 
 orRows :: [[Value]] -> [Value]
-orRows (x:xs) = orArray x : orRows xs
+orRows (x:xs) = xor aLL (orArray x) : orRows xs
 orRows _ = []
 
 orCols :: [[Value]] -> [Value]
@@ -74,32 +77,28 @@ orSqrs :: [[Value]] -> [Value]
 orSqrs (x:y:z:xs) = helper x y z ++ orSqrs xs
     where
         helper :: [Value] -> [Value] -> [Value] -> [Value]
-        helper (x0:x1:x2:xs) (y0:y1:y2:ys) (z0:z1:z2:zs) = orArray [x0, x1, x2, y0, y1, y2, z0, z1, z2] : helper xs ys zs
+        helper (x0:x1:x2:xs) (y0:y1:y2:ys) (z0:z1:z2:zs) = xor aLL (orArray [x0, x1, x2, y0, y1, y2, z0, z1, z2]) : helper xs ys zs
         helper _ _ _ = []
 orSqrs _ = []
 
-flipList :: [Value] -> [Value]
-{-# INLINE flipList #-}
-flipList = map (xor (aLL))
-
 genSudoku :: [[Value]] -> Sudoku
-genSudoku vals = Sudoku arrayPow2 flipRows flipCols flipSqrs
+genSudoku vals = Sudoku arrayPow2 newRows newCols newSqrs
     where
         arrayPow2 = map (map toPow2) vals
-        flipRows = flipList (orRows arrayPow2)
-        flipCols = flipList (orCols arrayPow2)
-        flipSqrs = flipList (orSqrs arrayPow2)
+        newRows = orRows arrayPow2
+        newCols = orCols arrayPow2
+        newSqrs = U.listArray (0,s) (orSqrs arrayPow2)
 
 and3 :: Value -> Value -> Value -> Value
 {-# INLINE and3 #-}
 and3 a b c = (.&.) a ((.&.) b c)
 
 genSudokuFromPrev :: [[Value]] -> Sudoku
-genSudokuFromPrev vals = Sudoku vals flipRows flipCols flipSqrs
+genSudokuFromPrev vals = Sudoku vals newRows newCols newSqrs
     where
-        flipRows = flipList (orRows vals)
-        flipCols = flipList (orCols vals)
-        flipSqrs = flipList (orSqrs vals)
+        newRows = orRows vals
+        newCols = orCols vals
+        newSqrs = U.listArray (0,s-1) (orSqrs vals)
 
 
 sumRows :: [[Value]] -> Bool
