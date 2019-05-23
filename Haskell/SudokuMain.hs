@@ -53,35 +53,38 @@ vals_impossible = --It should return sudokuEMPTY and False when checked with isV
         [0, 0, 0,  0, 0, 0,  0, 0, 0]]
 
 
-solve :: Sudoku -> Sudoku
-solve sud = if somethingChanged then solve generateNext else generateNext
+--Calls setForced while setForced makes changes
+setAllForced :: Sudoku -> Sudoku
+setAllForced sud = if somethingChanged then setAllForced next else next
     where
-        (next, rest, somethingChanged) = setAllPossible sud
-        generateNext = genSudokuFromPrev next rest
+        (next, somethingChanged) = setForced sud
 
-setAllPossible :: Sudoku -> ([[Value]], [(Int, Int)], Bool)
-setAllPossible (Sudoku vs rest rows cols sqrs) = (updateVs vs totalChanges 0, finalRemeaning, not (null totalChanges)) 
+--Sets all the forced values for a sudoku. 
+--eg.: The only possible value in a tile is 1, it sets the value as 1 
+setForced :: Sudoku -> (Sudoku, Bool)
+setForced (Sudoku vs rest rows cols sqrs) = (Sudoku (updateVs vs totalChanges 0) finalRemeaning finalR finalC finalS, not (null totalChanges)) 
     where
-        helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)])
-        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs = if popCount possible == 1 then ((rowCounter, colCounter, possible):changed', newRem') else (changed, tup:newRem) 
+        helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)], Arr, Arr, Arr)
+        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs = if popCount possible == 1 then ((rowCounter, colCounter, possible):changed', newRem', lastR', lastC', lastS') else (changed, tup:newRem, lastR, lastC, lastS) 
             where
                 possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
-                (changed, newRem) =  helper rest rows cols sqrs
-                (changed', newRem') =  helper rest newR newC newS
-                (newR, newC, newS) = updateRowsColsSqrs (xor constALL possible) rowCounter colCounter rows cols sqrs
-        helper _ _ _ _ = ([], [])
+                
+                (changed, newRem, lastR, lastC, lastS) =  helper rest rows cols sqrs
+                (changed', newRem', lastR', lastC', lastS') =  helper rest newR newC newS
+                
+                (newR, newC, newS) = updateRCS (xor constALL possible) rowCounter colCounter rows cols sqrs
+        
+        helper _ rows cols sqrs = ([], [], rows, cols, sqrs)
     
-        (totalChanges, finalRemeaning) = helper rest rows cols sqrs
+        (totalChanges, finalRemeaning, finalR, finalC, finalS) = helper rest rows cols sqrs
 
+--Returns False if an empty tile has no possible values
 canBeFinished :: Sudoku -> Bool
 canBeFinished (Sudoku _ rest rows cols sqrs) = helper rest
     where
         helper :: [(Int, Int)] -> Bool
         helper ((rowCounter, colCounter):rems) = if and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter)) == 0 then False else helper rems
         helper _ = True
-
-getNextVal :: Value -> Int -> Value
-getNextVal val c = if ((.&.) val c) == c then c else getNextVal val (shift c 1)
 
 
 --Generates a list with all the possible values in a tile
@@ -99,11 +102,13 @@ fall (sudo:sudos) = if pos then (res, True) else fall sudos
         (res, pos) = solveRecursively sudo
 fall _ = (sudokuEMPTY, False)
 
-
+--In charge of calling setAllForced / fall in order, starting point of the program
 solveRecursively :: Sudoku -> (Sudoku, Bool)
 solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) else if isFinished setAll then (setAll, True) else fall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
     where
-        setAll@(Sudoku vs rest rows cols sqrs) = solve sud
+        setAll :: Sudoku
+        setAll@(Sudoku vs rest rows cols sqrs) = setAllForced sud
+        
         ((rowCounter, colCounter):newRem) = rest
         possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
 
