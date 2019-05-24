@@ -10,7 +10,10 @@ type Value = Int
 type Arr = (UArray Int Value)
 
 --TODO?: Change the board / values / vs from a 2d list to a 2d UArray
-data Sudoku = Sudoku ![[Value]] ![(Int, Int)] !Arr !Arr !Arr deriving (Eq)
+data Sudoku = Sudoku [[Value]] [(Int, Int)] Arr Arr Arr deriving (Eq)
+
+--Possible improvements:
+--  Use Data.Vectors.Unboxed for the board / remeaning. Probably even worse performance
 
 constR :: Int
 constS :: Int
@@ -45,8 +48,8 @@ fromPow2 x acc = if x <= 0 then acc else fromPow2 (shift x (-1)) (acc + 1)
 
 --Fast, it only checks if there are no values remeaning. If everything works well, there should be no problem
 isFinished :: Sudoku -> Bool
-isFinished (Sudoku _ [] _ _ _) = True
-isFinished _ = False
+{-# INLINE isFinished #-}
+isFinished (Sudoku _ rem _ _ _) = null rem
 
 --Slower, more reliable version. It checks if any of the tiles is empty (has a 0)
 isFinishedSlow :: Sudoku -> Bool
@@ -158,6 +161,7 @@ updateRCS valMask rowCount colCount oldR oldC oldS = (newR, newC, newS)
 
 --Regenerates the sudoku after only one tile has been changed
 genSudokuOneChange :: Sudoku -> Value -> Int -> Int -> Sudoku
+{-# INLINE genSudokuOneChange #-}
 genSudokuOneChange (Sudoku oldVs newRem oldR oldC oldS) newVal rowCount colCount = Sudoku newVs newRem newR newC newS
     where
         valMask :: Value
@@ -179,15 +183,6 @@ subIn vs r c val = before ++ (bf ++ val : af) : after
         (before, row:after) = splitAt r vs
         (bf, _:af) = splitAt c row
 
-{-
-splitWhile :: (a -> Bool) -> [a] -> ([a], [a])
-splitWhile f (x:xs)
-    | f x = (x : a, b)
-    | True = ([], x:xs)
-    where
-        (a, b) = splitWhile f xs
-splitWhile _ [] = ([], [])
--}
 
 --Updates all the values in the board from an array of (r, c, newValue)
 updateVs :: [[Value]] -> [(Int, Int, Value)] -> Int -> [[Value]]
@@ -242,4 +237,3 @@ isValid (Sudoku vs _ _ _ _) = sumRows vs && sumCols vs && (sum (sumSquares vs)) 
         sumRecurs :: [Value] -> [Value] -> [Value] -> Value
         sumRecurs (x1:x2:x3:xss) (y1:y2:y3:yss) (z1:z2:z3:zss) = x1 + x2 + x3 + y1 + y2 + y3 + z1 + z2 + z3 + sumRecurs xss yss zss
         sumRecurs _ _ _ = 0
-

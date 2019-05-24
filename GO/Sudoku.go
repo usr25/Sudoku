@@ -262,58 +262,46 @@ func updateOne(index int, s *Sudoku){
 }
 
 
-func setForced(s *Sudoku) int{
-	/* Does 1 iteration through the board setting all the tiles with just 1 possibility
-	 * Returns:
-	 *	0 if there were no changes
-	 *	1 if there was at least one change
-	 *	2 if the board is unsolvable
-	 */
-	var i, j int
-	var val int
-	var available, mask Value
-	var updated int
-
-	for k := 0; k < counter; k++{
-		val = remeaning[k]
-		if s.board[val] != 0{
-			continue
-		}
-		i, j = coord(val)
-		available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[getSqrIndex(i, j)]
-
-		if available == 0{
-			return 2
-		}
-
-		if isPow2(available){
-			s.board[val] = available
-			mask = ALL ^ available
-			
-			s.rowsAv[i] &= mask
-			s.colsAv[j] &= mask
-			s.sqrsAv[getSqrIndex(i, j)] &= mask
-
-			updated = 1
-			
-			forcedChanges++ //DEBUG
-
-		}
-	}
-
-	return updated
-}
-
 func setAllForced(s *Sudoku) bool{
 	/* Calls set_forced until there are no more forced tiles.
 	 * Returns false if the board is unsolvable
 	 */
-	for lastUpdate := 1; lastUpdate == 1;{
-		lastUpdate = setForced(s)
-		if lastUpdate == 2{
-			return false
+	var i, j int
+	var val int
+	var available, mask Value
+
+	for lastUpdate := true; lastUpdate;{
+
+		lastUpdate = false
+
+		for k := 0; k < counter; k++{
+			val = remeaning[k]
+			if s.board[val] != 0{
+				continue
+			}
+			i, j = coord(val)
+			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[getSqrIndex(i, j)]
+
+			if available == 0{
+				return false
+			}
+
+			if isPow2(available){
+				s.board[val] = available
+				mask = ALL ^ available
+				
+				s.rowsAv[i] &= mask
+				s.colsAv[j] &= mask
+				s.sqrsAv[getSqrIndex(i, j)] &= mask
+
+				lastUpdate = true
+				
+				forcedChanges++ //DEBUG
+
+			}
 		}
 	}
+	
 	return true
 }
 

@@ -19,7 +19,7 @@ $ `python3 "dir/Python/sudoku.py" `
 
 $ `python2 "dir/Python/compiler.py"  #Requires Cython, check the official website`
 
-$ `ghc -O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
+$ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
  
 
 ### Results
@@ -31,10 +31,10 @@ $ `ghc -O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
   * **Python2** -> 9.8s, 9800%
   * **Python3** -> 14.2s, 14200%
   * **Cython** -> 1.2s, 1200%
-  * **Haskell** -> 7.3s, 7300%
+  * **Haskell** -> 7.0s, 7000%
 
 ### Algorithm
-  Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues.
+  Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
 
   The possible values for each square are the intersection of the possible values in its row / col / sqr
 
@@ -48,6 +48,6 @@ $ `ghc -O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
 
 
 ### Notes
-  * Haskell is generally faster than Python, however, solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy code). The Haskell implementation involves a lot of innecessary copying / writing.
+  * Solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy and suboptimal code). The Haskell implementation involves a lot of unnecessary copying / writing.
 
-  * Python2(.7) seems to be significantly faster than Python3(.5)
+  * Python2(.7) seems to be significantly faster than Python3(.5/.7), at least on my machine

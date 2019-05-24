@@ -67,6 +67,7 @@ setForced (Sudoku vs rest rows cols sqrs) = (Sudoku (updateVs vs totalChanges 0)
         helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)], Arr, Arr, Arr)
         helper (tup@(rowCounter, colCounter):rest) rows cols sqrs = if popCount possible == 1 then ((rowCounter, colCounter, possible):changed', newRem', lastR', lastC', lastS') else (changed, tup:newRem, lastR, lastC, lastS) 
             where
+                possible :: Value
                 possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
                 
                 (changed, newRem, lastR, lastC, lastS) =  helper rest rows cols sqrs
@@ -110,6 +111,7 @@ solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) e
         setAll@(Sudoku vs rest rows cols sqrs) = setAllForced sud
         
         ((rowCounter, colCounter):newRem) = rest
+        possible :: Value
         possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
 
 
