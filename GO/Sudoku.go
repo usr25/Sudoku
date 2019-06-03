@@ -7,9 +7,10 @@ import ("fmt";"strconv";"time")
 /*------------------------CONST------------------------------*/
 
 const S int = 9
+const US uint = uint(S)
 const SS int = S*S
 const R int = 3
-const ALL Value = (1 << uint(S)) - 1
+const ALL Value = (1 << US) - 1
 
 type Value uint
 
@@ -27,10 +28,6 @@ type Sudoku struct{
 	sqrsAv [S]Value
 }
 
-type Pair struct{
-	b bool
-	s Sudoku
-}
 
 /*-------------------------GLOBAL----------------------------*/
 
@@ -94,7 +91,7 @@ func log2(v Value) int{
 
 func popCount(v Value) (pc int){
 
-	for i := uint(0); i < uint(S); i++ {
+	for i := uint(0); i < US; i++ {
 		if v & (1 << i) != 0{
 			pc++
 		}
@@ -355,8 +352,8 @@ func (self Sudoku) solve() (bool, Sudoku){
 	*/
 	var allPos Value = self.possible(index)
 	var val Value
-	for i := 0; i < S; i++ {
-		val = (1 << uint(i))
+	for i := uint(0); i < US; i++ {
+		val = 1 << i
 		if val & allPos == 0{
 			continue
 		}
@@ -377,7 +374,7 @@ func (self Sudoku) solve() (bool, Sudoku){
 }
 
 
-func SolveMain(self Sudoku) (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*calls*/ int){
+func (self Sudoku) solveMain() (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*calls*/ int){
 
 	setPossible(&self)
 	isPos := setAllForced(&self)
@@ -416,10 +413,9 @@ func SolveMain(self Sudoku) (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*calls
 	}
 
 	ch := make(chan Sudoku, pc)
-
 	var val Value
-	for i := 0; i < S; i++ {
-		val = (1 << uint(i))
+	for i := uint(0); i < US; i++ {
+		val = 1 << i
 		if val & allPos == 0{
 			continue
 		}
@@ -435,7 +431,6 @@ func SolveMain(self Sudoku) (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*calls
 	close(ch)
 
 	for nxt := range ch{
-		fmt.Println("A")
 		if nxt != EMPTY{
 			ok := nxt.filledTiles() == SS && nxt.verifySudoku()
 			return nxt, ok, forcedChanges, calls
@@ -457,7 +452,7 @@ func main(){
 
 	start := time.Now()
 
-	s, ok, forcedChanges, calls := SolveMain(s)
+	s, ok, forcedChanges, calls := s.solveMain()
 
 	end := time.Now()
 
