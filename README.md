@@ -25,7 +25,7 @@ $ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
 ### Results
 (In my computer, solving the 17-clue sudoku which is hard coded, the proportions should stay the same regardless of the device)
 
-  * **GO**     -> 430ms, 430%. 
+  * **GO**     -> 360ms, 360%. 
   * **Rust**   -> 100ms, 100%
   * **C**      -> 100ms, 100%
   * **Python2** -> 9.8s, 9800%

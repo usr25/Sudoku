@@ -1,5 +1,6 @@
 package main
 
+//TODO: bits.OnesCount()
 import ("fmt";"strconv";"time")
 
 
@@ -26,8 +27,14 @@ type Sudoku struct{
 	sqrsAv [S]Value
 }
 
+type Pair struct{
+	b bool
+	s Sudoku
+}
+
 /*-------------------------GLOBAL----------------------------*/
 
+var EMPTY Sudoku = Sudoku{}
 //To count the nodes and changes made
 var forcedChanges int
 var calls int
@@ -85,7 +92,16 @@ func log2(v Value) int{
 	}
 }
 
+func popCount(v Value) (pc int){
 
+	for i := uint(0); i < uint(S); i++ {
+		if v & (1 << i) != 0{
+			pc++
+		}
+	}
+
+	return
+}
 
 func index(i, j int) int{
 	return S*i + j
@@ -357,40 +373,99 @@ func (self Sudoku) solve() (bool, Sudoku){
 		}
 	}
 
-	return false, Sudoku{}
+	return false, EMPTY
 }
 
-func SolveMaster(s Sudoku) (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*calls*/ int){
-	rs := Sudoku(s)
 
-	setPossible(&rs)
+func SolveMain(self Sudoku) (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*calls*/ int){
 
-	if ! rs.canBeFinished(){
-		return s, false, 0, 0
+	setPossible(&self)
+	isPos := setAllForced(&self)
+
+	if ! isPos{
+		return EMPTY, false, 0, 0
 	}
-	_, rs = rs.solve()
 
-	ok := rs.filledTiles() == SS && rs.verifySudoku()
+	//Find the first empty tile in the board
+	var index, i int
+	for ; self.board[index] != 0 && i < counter; i++{
+		index = remeaning[i]	
+	}
 
-	return rs, ok, forcedChanges, calls
+	allPos := self.possible(index)
+	pc := popCount(allPos)
+
+	fst := true
+
+	//Find the most optimal tile (only 2 possible) or a suboptimal (3 possible)
+	//Wort case: Nothing is found and we will use the one from the first loop
+	for ; i < counter; i++ {
+		tempPC := popCount(self.possible(remeaning[i]))
+
+		if tempPC == 2{
+			index = remeaning[i]
+			allPos = self.possible(index)
+			pc = tempPC
+			break
+		}else if fst && tempPC == 3{
+			fst = false
+			index = remeaning[i]
+			allPos = self.possible(index)
+			pc = tempPC
+		}
+	}
+
+	ch := make(chan Sudoku, pc)
+
+	var val Value
+	for i := 0; i < S; i++ {
+		val = (1 << uint(i))
+		if val & allPos == 0{
+			continue
+		}
+
+		newS := Sudoku(self) //Duplicates self
+		newS.board[index] = val
+		updateOne(index, &newS)
+		
+		if newS.canBeFinished(){ //This reduces the number of branches by about 1/4
+			ch <- helper(newS)
+		}
+	}
+	close(ch)
+
+	for nxt := range ch{
+		fmt.Println("A")
+		if nxt != EMPTY{
+			ok := nxt.filledTiles() == SS && nxt.verifySudoku()
+			return nxt, ok, forcedChanges, calls
+		}
+	}
+	return EMPTY, false, forcedChanges, calls
 }
+
+func helper(s Sudoku) Sudoku{
+	_, s = s.solve()
+	return s
+}
+
 
 func main(){
 
 	s := GenSud()
 	fmt.Println(s.PrintSudoku())
-	
+
 	start := time.Now()
-	
-	s, ok, forcedChanges, calls := SolveMaster(s)
+
+	s, ok, forcedChanges, calls := SolveMain(s)
 
 	end := time.Now()
 
+	
 	fmt.Println(s.PrintSudoku())
 
 	fmt.Println("\nTotal changes:", forcedChanges)
 	fmt.Println("Total nodes:", calls)
 	fmt.Println("Is valid:", ok)
 	fmt.Println("Time:", end.Sub(start))
-	
 }
