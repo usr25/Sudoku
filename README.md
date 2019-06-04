@@ -50,6 +50,6 @@ In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudok
 ### Notes
   * Solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy and suboptimal code). The Haskell implementation involves a lot of unnecessary copying / writing.
 
-  * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, an the abundant use of integers in the sudoku
+  * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, paired with the abundant use of integers in the sudoku
 
   * Concurrency isn't always an improvement: in Go it yields better results, in Python the same, and worse in Rust.
