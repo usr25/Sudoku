@@ -15,15 +15,15 @@ $ `rustc -O "dir/Rust/Sudoku.rs"  #Run the resulting binary file in $pwd`
 
 $ `gcc -O3 -std=c11 -faggressive-loop-optimizations "dir/C/Sudoku.c" #Run the resulting binary in $pwd`
 
-$ `python3 "dir/Python/sudoku.py" `
+$ `python3 "dir/Python/sudoku.py" #Can also be run with python2`
 
-$ `python2 "dir/Python/compiler.py"  #Requires Cython, check the official website`
+$ `python2 "dir/Python/compiler.py"  #Requires Cython, check the [official website](https://cython.org/)`
 
 $ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
  
 
 ### Results
-(In my computer, solving the 17-clue sudoku which is hard coded, the proportions should stay the same regardless of the device)
+In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded, the proportions should stay the same regardless of the device
 
   * **GO**     -> 360ms, 360%. 
   * **Rust**   -> 100ms, 100%
@@ -50,4 +50,6 @@ $ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
 ### Notes
   * Solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy and suboptimal code). The Haskell implementation involves a lot of unnecessary copying / writing.
 
-  * Python2(.7) seems to be significantly faster than Python3(.5/.7), at least on my machine
+  * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, an the abundant use of integers in the sudoku
+
+  * Concurrency isn't always an improvement: in Go it yields better results, in Python the same, and worse in Rust.
