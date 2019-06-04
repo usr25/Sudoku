@@ -1,7 +1,10 @@
+from multiprocessing import Pool
+
 R = 3
 S = 9
 SS = S*S
 ALL = (1 << S) - 1
+      
 
 class Sudoku(object):
     """This is the main class of the program.
@@ -62,7 +65,7 @@ class Sudoku(object):
 
     def set_forced(self):
         """
-        Sets all the tiles which have 1 possible value in one iteration through the board
+        Sets all the tiles which have 1 possible value in one iteration throught the board
         Returns:
            0 if there were no changes
            1 if at least one tile was updated
@@ -204,10 +207,48 @@ def solve(sud):
 
     return False, None
 
+def start(sud):
+    """
+    Special version of solve() which takes advantage of multithreading
+    It is only called once at the beggining of the program
+    """
+    is_pos = sud.set_all_forced()
+
+    if not is_pos:
+        return False, None
+    elif sud.is_finished():
+        return True, sud
+
+    index = sud.remeaning[-1]
+
+    for rem_index in sud.remeaning:
+        tpc = bin(sud.possible(rem_index)).count('1')
+        if tpc == 2:
+            index = rem_index
+            break
+        elif tpc == 3:
+            index = rem_index
+
+    sud.remeaning.remove(index)
+
+    pool = Pool(bin(sud.possible(index)).count('1'))
+    ls = [(sud, v, index) for v in ls_of_possible(sud.possible(index))] 
+    result = pool.map(get_nxt, ls)
+
+    clean = [res for (b,res) in result if b]
+    return clean[0] 
+
+def get_nxt(three):
+    new_sud, value, index = three
+    new_sud.board[index] = value
+    new_sud.update_one(index)
+
+    return solve(new_sud)
+
 def main():
     sudoku = generate_sudoku()
     print(sudoku)
-    _, res = solve(sudoku)
+    res = start(sudoku)
     print(res)
 
 
