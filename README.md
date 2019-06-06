@@ -25,13 +25,14 @@ $ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
 ### Results
 In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded, the proportions should stay the same regardless of the device
 
-  * **GO**     -> 360ms, 360%. 
-  * **Rust**   -> 100ms, 100%
+  * **GO**     -> 306ms, 306%
+  * **Rust**   -> 90ms, 90%
+  * **Rust P** -> 95ms, 95%
   * **C**      -> 100ms, 100%
   * **Python2** -> 9.8s, 9800%
   * **Python3** -> 14.2s, 14200%
   * **Cython** -> 1.2s, 1200%
-  * **Haskell** -> 7.0s, 7000%
+  * **Haskell** -> 7.5s, 7500%
 
 ### Algorithm
   Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
