@@ -19,11 +19,12 @@ $ `python3 "dir/Python/sudoku.py" #Can also be run with python2`
 
 $ `python2 "dir/Python/compiler.py"  #Requires Cython, check the [official website](https://cython.org/)`
 
-$ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
- 
+$ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O2 improves performance x5`
+$ `ghc -O2 -optc-O3 -threaded "dir/Haskell/SudokuParallel.hs && ./SudokuParallel +RTS -N<Number of cores> -RTS` 
 
 ### Results
 In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded, the proportions should stay the same regardless of the device
+(P stands for parallel)
 
   * **GO**     -> 306ms, 344%
   * **Rust**   -> 85ms, 95%
@@ -32,7 +33,8 @@ In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudok
   * **Python2** -> 9.8s, 11011%
   * **Python3** -> 14.2s, 15955%
   * **Cython** -> 1.2s, 1348%
-  * **Haskell** -> 7.5s, 8426%
+  * **Haskell** -> 7.3s, 8426%
+  * **Haskell P** -> 6.4s, 7191%
 
 ### Algorithm
   Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).

@@ -171,9 +171,12 @@ genSudokuOneChange (Sudoku oldVs newRem oldR oldC oldS) newVal rowCount colCount
         (newR, newC, newS) = updateRCS valMask rowCount colCount oldR oldC oldS
 
 --Extracts the smallest power of 2 of a value (9 -> 1, 10 -> 2, 192 -> 64)
-getNextVal :: Value -> Int -> Value
-getNextVal val c = if ((.&.) val c) == c then c else getNextVal val (shift c 1)
-
+getNextVal :: Value -> Value -> Value
+{-# INLINE getNextVal #-}
+getNextVal val c = loop c
+    where
+        loop :: Value -> Value
+        loop v = if ((.&.) val v) == v then v else loop (shift v 1) 
 
 --Changes a value in the position (r, c) in a 2d list
 subIn :: [[Value]] -> Int -> Int -> Value -> [[Value]]

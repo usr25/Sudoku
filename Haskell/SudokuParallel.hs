@@ -2,6 +2,7 @@ module Main where
 
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Data.Maybe (fromJust)
+import Control.Parallel (par, pseq)
 
 import Data.Bits
 import Data.Array.Unboxed
@@ -120,12 +121,31 @@ solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) e
         possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
 
 
+solveParallel :: Sudoku -> (Sudoku, Bool)
+solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible 1)
+    where 
+        setAll :: Sudoku
+        setAll@(Sudoku vs rest rows cols sqrs) = setAllForced sud
+
+        ((rowCounter, colCounter):newRem) = rest
+        possible :: Value
+        possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+
+        parFall :: [Sudoku] -> (Sudoku, Bool)
+        parFall (sudo:sudos) = pair `par` (next `pseq` (if snd pair then pair else next))
+            where
+                next = parFall sudos
+                pair = solveRecursively sudo
+                
+        parFall _ = (sudokuEMPTY, False)
+
+
 main :: IO()
 main = do
 
-    let easy = fst $ solveRecursively $ genSudoku vals_easy
-    let tree = fst $ solveRecursively $ genSudoku vals_tree
-    let r = fst $ solveRecursively $ genSudoku vals_final
+    let easy = fst $ solveParallel $ genSudoku vals_easy
+    let tree = fst $ solveParallel $ genSudoku vals_tree
+    let r = fst $ solveParallel $ genSudoku vals_final
 
     print $ isValid $ easy
     print $ isValid $ tree
