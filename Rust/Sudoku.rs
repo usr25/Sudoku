@@ -240,12 +240,11 @@ impl Sudoku {
 
 			let index = s.remeaning.pop().expect("NO ELEMS");
 			let possible = s.possible(index);
-			let mut val: Value;
+			let mut val: Value = 1;
 			
-			for i in 0..S{
-
-				val = 1 << i;				
+			for _ in 0..S{
 				if val & possible == 0{
+					val <<= 1;
 					continue
 				}
 				let mut new_sud = s.clone();
@@ -257,6 +256,8 @@ impl Sudoku {
 				if pos{
 					return (true, res);
 				}
+
+				val <<= 1;
 			}
 		}
 

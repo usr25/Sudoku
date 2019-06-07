@@ -9,7 +9,7 @@ _Requires go, rustc, gcc, python2/3, Cython and ghc. Other compilers may yield d
 
 Place the files in a directory "dir"
 
-$ `go install "dir/GO/Sudoku.go"  #Binary should be placed in GOBIN`
+$ `go install "dir/GO/Sudoku.go"  #Binary should be placed in GOBIN, if it is not set type $export GOBIN=dirname`
 
 $ `rustc -O "dir/Rust/Sudoku.rs"  #Run the resulting binary file in $pwd`
 
@@ -25,14 +25,14 @@ $ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O3 improves performance x5`
 ### Results
 In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded, the proportions should stay the same regardless of the device
 
-  * **GO**     -> 306ms, 306%
-  * **Rust**   -> 90ms, 90%
-  * **Rust P** -> 95ms, 95%
-  * **C**      -> 100ms, 100%
-  * **Python2** -> 9.8s, 9800%
-  * **Python3** -> 14.2s, 14200%
-  * **Cython** -> 1.2s, 1200%
-  * **Haskell** -> 7.5s, 7500%
+  * **GO**     -> 306ms, 344%
+  * **Rust**   -> 85ms, 95%
+  * **Rust P** -> 89ms, 100%
+  * **C**      -> 89ms, 100%
+  * **Python2** -> 9.8s, 11011%
+  * **Python3** -> 14.2s, 15955%
+  * **Cython** -> 1.2s, 1348%
+  * **Haskell** -> 7.5s, 8426%
 
 ### Algorithm
   Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
@@ -54,3 +54,5 @@ In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudok
   * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, paired with the abundant use of integers in the sudoku
 
   * Concurrency isn't always an improvement: in Go it yields better results, in Python the same, and worse in Rust.
+
+  * Some languages, such as C, benefit from using 64bit-integers while others, such as Rust, don't and even yield worse performance. This may be due to the native size of the CPU and being able to fit more in the cache making up for eachother

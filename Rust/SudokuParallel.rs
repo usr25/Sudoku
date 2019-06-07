@@ -246,11 +246,11 @@ impl Sudoku {
 
 			let index = s.remeaning.pop().expect("NO ELEMS");
 			let possible = s.possible(index);
-			let mut val: Value;
+			let mut val: Value = 1;
 			
-			for i in 0..S{
-				val = 1 << i;
+			for _ in 0..S{
 				if val & possible == 0{
+					val <<= 1;
 					continue
 				}
 				let mut new_sud = s.clone();
@@ -262,6 +262,8 @@ impl Sudoku {
 				if pos{
 					return (true, res);
 				}
+
+				val <<= 1;
 			}
 		}
 
@@ -294,11 +296,9 @@ impl Sudoku {
                 }
             }
 
-            //Create new channels
             let (tx, rx) = mpsc::channel();
             let mut new_rem: Vec<usize> = Vec::with_capacity(s.remeaning.len() - 1);
             
-            //Duplicate the Vector with the value removed, this is because vec.remove() cant be used in production versions
             for temp_index in s.remeaning.iter() {
                 if *temp_index != index{
                     new_rem.push(*temp_index);
@@ -310,11 +310,11 @@ impl Sudoku {
             //spawn the threads
             thread::spawn(move || {
                 let possible = s.possible(index);
-                let mut val: Value;
+                let mut val: Value = 1;
 
-                for i in 0..S{
-                    val = 1 << i;
+                for _ in 0..S{
                     if val & possible == 0{
+                        val <<= 1;
                         continue
                     }
                     let mut new_sud = s.clone();
@@ -323,6 +323,8 @@ impl Sudoku {
                     new_sud.update(index);
                     
                     tx.send(Sudoku::solve(new_sud)).unwrap();
+
+                    val <<= 1;
                 }
             });
 
@@ -394,7 +396,6 @@ fn gen_sudoku() -> Sudoku{
 fn main() {
 
     let s = gen_sudoku();
-
     println!("{}", s.print_sudoku());
     println!("{}, {}", s.is_valid(), s.filled_squares());
     
