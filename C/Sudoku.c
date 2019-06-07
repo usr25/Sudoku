@@ -19,19 +19,18 @@
 static inline int POS(int x) { return 1 << (x-1); }
 static inline int POW2(char pow) { return 1 << pow; }
 static inline int GET_SQR(int i, int j) { return R * (int)(i/R) + (int)(j/R); }
-static inline unsigned char GET_X(unsigned short c) { return (c) & 0xf; }
-static inline unsigned char GET_Y(unsigned short c) { return ((c) & 0xf0) >> 4; }
-static inline unsigned char GET_CRD(int i, int j) { return (i << 4) + j; }
-static inline bool VAL_IN_BYTE(unsigned short byte, int k) { return (byte & (1<<k)) != 0; } 
+static inline int GET_X(unsigned short c) { return (c) & 0xf; }
+static inline int GET_Y(unsigned short c) { return ((c) & 0xf0) >> 4; }
+static inline int GET_CRD(int i, int j) { return (i << 4) + j; }
 
 /*------------------------PROTOTYPES------------------------*/
 
 typedef struct {
-    unsigned char values[S][S];
+    int values[S][S];
     
-    unsigned short rowsPos[S];
-    unsigned short colsPos[S];
-    unsigned short sqrsPos[S];
+    int rowsPos[S];
+    int colsPos[S];
+    int sqrsPos[S];
 } Board;
 
 Board generateSudoku();
@@ -39,15 +38,15 @@ void printBoard(Board board);
 
 void solve(Board *board);
 
-bool dfs(Board *board, unsigned char index);
-char setAllForced(Board *board, unsigned char min);
+bool dfs(Board *board, int index);
+char setAllForced(Board *board, int min);
 
 void calculatePossible(Board *board);
 void updateTileAdded(Board *board, const char y, const char x);
 
-unsigned char getNextPossibleValue(Board board, const char val, const char x, const char y);
+int getNextPossibleValue(Board board, const int val, const char x, const char y);
 
-unsigned char log_2(unsigned short index);
+int log_2(int index);
 
 bool checkBoard(Board board);
 bool completeBoard(Board board);
@@ -55,8 +54,8 @@ bool finishedBoard(Board board);
 
 /*--------------------------GLOBAL--------------------------*/
 
-unsigned char blanks[S*S];
-unsigned char blanks_size = 0;
+int blanks[S*S];
+int blanks_size = 0;
 
 /*--------------------------BOARD---------------------------*/
 Board generateSudoku(){
@@ -82,26 +81,27 @@ Board generateSudoku(){
     
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
-            board.values[i][j] = values[i][j];
             if (values[i][j] == 0){
                 blanks[blanks_size++] = GET_CRD(i, j);
+            }else{
+                board.values[i][j] = POS(values[i][j]);
             }
         }
     }
-    
+
     return board;
 }
 
 void printBoard(Board board) {
     printf("Board values: \n");
     printf("---------------------------\n");
-    
+
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
             if (board.values[i][j] == 0) {
                 printf(" - ");
             } else {
-                printf(" %hhu ", board.values[i][j]);
+                printf(" %d ", log_2(board.values[i][j]) + 1);
             }
         }
         printf("\n");
@@ -120,7 +120,7 @@ bool checkBoard(Board board) {
         row = 0;
         for (int j = 0; j < S; j++) {
             if (board.values[i][j] != 0) {
-                pos = POS(board.values[i][j]);
+                pos = board.values[i][j];
                 if ((pos & row) != 0) return false;
                 row |= pos;
             }
@@ -132,7 +132,7 @@ bool checkBoard(Board board) {
         col = 0;
         for (int j = 0; j < S; j++) {
             if (board.values[j][i] != 0) {
-                pos = POS(board.values[j][i]);
+                pos = board.values[j][i];
                 if ((pos & col) != 0) return false;
                 col |= pos;
             }
@@ -146,7 +146,7 @@ bool checkBoard(Board board) {
             for (int k = i; k < i + R; k++) {
                 for (int l = j; l < j + R; l++) {
                     if (board.values[k][l] != 0) {
-                        pos = POS(board.values[k][l]);
+                        pos = board.values[k][l];
                         if ((pos & sqr) != 0) return false;
                         sqr |= pos;
                     }
@@ -161,7 +161,7 @@ bool checkBoard(Board board) {
 bool completeBoard(Board board) {
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
-            if (board.values[i][j] <= 0 || board.values[i][j] > S) return false;
+            if (board.values[i][j] <= 0) return false;
         }
     }
     
@@ -174,10 +174,10 @@ bool finishedBoard(Board board) {
 
 /*--------------------------SOLVER--------------------------*/
 
-bool dfs(Board *board, unsigned char index) {
+bool dfs(Board *board, int index) {
     Board new_board;
-    unsigned char x, y, v;
-    unsigned char state, new_index;
+    int x, y;
+    int state, new_index;
     
     // If all values are set, the recursion is finished
     if (index >= blanks_size) return true;
@@ -189,9 +189,12 @@ bool dfs(Board *board, unsigned char index) {
     if (board->values[y][x] != 0)
         return dfs(board, index+1);
     
-    v = getNextPossibleValue(*board, board->values[y][x], x, y);
-    
-    while (v != 0) {
+    int possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[GET_SQR(y, x)];
+
+    for (int v = 1; v < ALL; v <<= 1)
+    {
+        if (!(v & possible))
+            continue;
         // Generates a new copy of the board to improve performance
         new_board = *board;
         new_board.values[y][x] = v;
@@ -210,8 +213,6 @@ bool dfs(Board *board, unsigned char index) {
             *board = new_board;
             return true;
         }
-
-        v = getNextPossibleValue(*board, v, x, y);
     }
 
     // There was no possible value to be chosen
@@ -222,14 +223,14 @@ bool dfs(Board *board, unsigned char index) {
  */
 void calculatePossible(Board *board) {
     unsigned short pos;
-    unsigned char m;
+    int m;
     
     // Goes tile by tile and saves all the found values
     for (char i = 0; i < S; i++) {
         for (char j = 0; j < S; j++) {
             if (board->values[i][j] != 0) {
                 m = GET_SQR(i,j);
-                pos = POS(board->values[i][j]);
+                pos = board->values[i][j];
                 
                 board->rowsPos[i] |= pos;
                 board->colsPos[j] |= pos;
@@ -250,28 +251,12 @@ void calculatePossible(Board *board) {
  * tile that was changed.
  */
 void updateTileAdded(Board *board, const char y, const char x) {
-    unsigned short val = ALL ^ POS(board->values[y][x]);
-    unsigned char m = GET_SQR(y,x);
+    int val = ALL ^ board->values[y][x];
+    int m = GET_SQR(y,x);
     
     board->rowsPos[y] &= val;
     board->colsPos[x] &= val;
     board->sqrsPos[m] &= val;
-}
-
-
-/* Takes a tile with a value and returns its next possible value.
- * If none, it returns 0.
- */
-unsigned char getNextPossibleValue(Board board, const char val, const char x, const char y) {
-    unsigned char m = GET_SQR(y, x);
-    unsigned short possible = board.rowsPos[y] & board.colsPos[x] & board.sqrsPos[m];
-    
-    for (char k = val; k < S; k++) {
-        if (VAL_IN_BYTE(possible, k))
-            return k + 1;
-    }
-    
-    return 0;
 }
 
 /* Sets all the tiles that only have one possible value.
@@ -281,9 +266,9 @@ unsigned char getNextPossibleValue(Board board, const char val, const char x, co
  *  2 if there is a tile with no possible value
  *  any other value if no modifications were made
  */
-char setAllForced(Board *board, unsigned char min) {
-    unsigned char x, y, m;
-    unsigned short possible;
+char setAllForced(Board *board, int min) {
+    int x, y, m;
+    int possible;
     char state = 0;
 
     for (char i = min; i < blanks_size && state != 2; i++) {
@@ -294,9 +279,9 @@ char setAllForced(Board *board, unsigned char min) {
         
         if (board->values[y][x] == 0) {
             state = 2 - __builtin_popcount(possible);
-            
+
             if (state == 1) {
-                board->values[y][x] = log_2(possible)+1;
+                board->values[y][x] = possible;
                 updateTileAdded(board, y, x);
             }
         }
@@ -305,8 +290,8 @@ char setAllForced(Board *board, unsigned char min) {
     return state;
 }
 
-unsigned char log_2(unsigned short index) {
-    unsigned char val = 0;
+int log_2(int index) {
+    int val = 0;
     while (index >>= 1) ++val;
     return val;
 }
@@ -323,8 +308,7 @@ int main(int argc, char const *argv[])
 {
     Board b = generateSudoku();
     printBoard(b);
-
-
+ 
     time_t start = clock();
     
     solve(&b);

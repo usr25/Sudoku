@@ -351,9 +351,8 @@ func (self Sudoku) solve() (bool, Sudoku){
 	}
 	*/
 	var allPos Value = self.possible(index)
-	var val Value
-	for i := uint(0); i < US; i++ {
-		val = 1 << i
+	var val Value = 1
+	for ; val < ALL; val <<= 1 {
 		if val & allPos == 0{
 			continue
 		}
@@ -413,9 +412,8 @@ func (self Sudoku) solveMain() (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*ca
 	}
 
 	ch := make(chan Sudoku, pc)
-	var val Value
-	for i := uint(0); i < US; i++ {
-		val = 1 << i
+	var val Value = 1
+	for ; val < ALL; val <<= 1 {
 		if val & allPos == 0{
 			continue
 		}

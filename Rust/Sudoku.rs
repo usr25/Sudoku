@@ -243,7 +243,8 @@ impl Sudoku {
 			let mut val: Value;
 			
 			for i in 0..S{
-				val = 1 << i;
+
+				val = 1 << i;				
 				if val & possible == 0{
 					continue
 				}
