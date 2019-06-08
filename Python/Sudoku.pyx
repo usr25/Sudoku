@@ -17,7 +17,7 @@ cdef class Sudoku(object):
         if remeaning:
             self.remeaning = remeaning
         else:
-            self.remeaning = [i for i in range(SS) if self.board[i] == 0]
+            self.remeaning = [i for i in range(SS) if not self.board[i]]
 
     def duplicate(self):
         return Sudoku(list(self.board), list(self.rows), list(self.cols), list(self.sqrs), list(self.remeaning))
@@ -25,8 +25,8 @@ cdef class Sudoku(object):
     def __repr__(self):
         cdef str s = "--------------------\n"
         cdef str s_small
-        cdef int i
-        cdef int j
+        cdef int i, j
+
         for i in range(S):
             s_small = ""
             for j in range(S):
@@ -53,54 +53,41 @@ cdef class Sudoku(object):
         i, j = coord(index)
         self.rows[i] &= ALL ^ self.board[index]
         self.cols[j] &= ALL ^ self.board[index]
-        self.sqrs[get_sqr_index(i, j)] &= ALL ^ self.board[index]
-
-    cdef int set_forced(self):
-        cdef list next_rem = []
-        cdef int updated = 0
-        cdef int index, i, j, available, mask
-
-        for index in self.remeaning:
-            i, j = coord(index)
-            available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)]
-            
-            if available == 0:
-                return 2
-
-            if is_pow_2(available) == 1:
-                mask = ALL ^ available
-                
-                self.board[index] = available
-                self.rows[i] &= mask
-                self.cols[j] &= mask
-                self.sqrs[get_sqr_index(i, j)] &= mask
-
-                updated = 1
-            else:
-                next_rem.append(index)
-
-        if updated == 1:
-            self.remeaning = next_rem
-
-        return updated
+        self.sqrs[get_sqr_index(i, j)] &= ALL ^ self.board[index]   
 
     def set_all_forced(self):
-        return self.c_set_all_forced()
-        
-    cdef int c_set_all_forced(self):
         cdef int last_update = 1
-        while last_update == 1:
-            last_update = self.set_forced()
-            if last_update == 2:
-                return 0
-        return 1
+        cdef list next_rem
+        cdef int index, i, j, available, mask
+
+        while last_update:
+            last_update = 0
+            next_rem = []
+            for index in self.remeaning:
+                i, j = coord(index)
+                available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)]
+                
+                if not available:
+                    return False
+
+                if is_pow_2(available):
+                    mask = ALL ^ available
+                    
+                    self.board[index] = available
+                    self.rows[i] &= mask
+                    self.cols[j] &= mask
+                    self.sqrs[get_sqr_index(i, j)] &= mask
+
+                    last_update = 1
+                else:
+                    next_rem.append(index)
+
+            if last_update:
+                self.remeaning = next_rem
+        return True
 
     def is_finished(self):
-        cdef int i
-        for i in self.board:
-            if i == 0:
-                return False
-        return True
+        return not all(self.board)
 
 cdef Sudoku generate_sudoku():
     
@@ -141,18 +128,16 @@ cdef Sudoku generate_sudoku():
 
     return Sudoku(board, rows, cols, sqrs)
 
-cdef int base10(int n):
-    if n == 0:
-        return 0
+cdef int base10(int n):    
     cdef int log = 0
-    while n != 1:
+    while n:
         log += 1
         n >>= 1
 
-    return 1 + log
+    return log
 
 cdef inline int get_pow(const int n):
-    return 0 if n == 0 else 1 << (n - 1)
+    return 1 << (n - 1) if n else 0
 
 cdef inline int index(const int i, const int j):
     return S * i + j
@@ -164,17 +149,17 @@ cdef inline int get_sqr_index(const int i, const int j):
     return R*(i // R) + (j // R)
 
 cdef inline int is_pow_2(const int v):
-    return (v & (v - 1)) == 0 and (v != 0)
+    return (v & (v - 1)) == 0
 
 cdef inline list ls_of_possible(const int v):
-    return [1<<i for i in range(S) if (v & (1 << i)) != 0]
+    return [1<<i for i in range(S) if v & (1 << i)]
 
 cdef tuple solve(sud):    
     cdef int is_pos = sud.set_all_forced()
 
-    if is_pos == 0:
+    if not is_pos:
         return False, None
-    elif sud.is_finished():
+    elif sud.remeaning == []:
         return True, sud
 
     cdef int index = sud.remeaning.pop()

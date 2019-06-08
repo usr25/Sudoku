@@ -110,7 +110,7 @@ func getSqrIndex(i, j int) int{
 	return R*(i/R) + (j/R)
 }
 func isPow2(v Value) bool{
-	return v & (v-1) == 0 && v != 0
+	return v & (v-1) == 0
 }
 
 
@@ -279,7 +279,7 @@ func setAllForced(s *Sudoku) bool{
 	/* Calls set_forced until there are no more forced tiles.
 	 * Returns false if the board is unsolvable
 	 */
-	var i, j int
+	var i, j, m int
 	var val int
 	var available, mask Value
 
@@ -293,7 +293,8 @@ func setAllForced(s *Sudoku) bool{
 				continue
 			}
 			i, j = coord(val)
-			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[getSqrIndex(i, j)]
+			m = getSqrIndex(i, j)
+			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[m]
 
 			if available == 0{
 				return false
@@ -305,7 +306,7 @@ func setAllForced(s *Sudoku) bool{
 				
 				s.rowsAv[i] &= mask
 				s.colsAv[j] &= mask
-				s.sqrsAv[getSqrIndex(i, j)] &= mask
+				s.sqrsAv[m] &= mask
 
 				lastUpdate = true
 				

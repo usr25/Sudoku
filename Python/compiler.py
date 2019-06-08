@@ -1,4 +1,4 @@
-import pyximport; pyximport.install(pyimport= True, build_dir = "/home/usr/Desktop")
+import pyximport; pyximport.install(pyimport= True, build_dir = "/home/j/CYTHON/temp")
 
 import Sudoku
 print("Finished compiling\n\t---===---")

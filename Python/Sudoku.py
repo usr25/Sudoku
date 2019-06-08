@@ -62,59 +62,45 @@ class Sudoku(object):
         self.rows[i] &= ALL ^ self.board[index]
         self.cols[j] &= ALL ^ self.board[index]
         self.sqrs[get_sqr_index(i, j)] &= ALL ^ self.board[index]
-
-    def set_forced(self):
-        """
-        Sets all the tiles which have 1 possible value in one iteration throught the board
-        Returns:
-           0 if there were no changes
-           1 if at least one tile was updated
-           2 if the board is unsolvable        
-        """
-        next_rem = []
-        updated = 0
-
-        for index in self.remeaning:
-            i, j = coord(index)
-            available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)]
-            
-            if available == 0:
-                return 2
-
-            if is_pow_2(available):
-                self.board[index] = available
-                self.rows[i] &= ALL ^ available
-                self.cols[j] &= ALL ^ available
-                self.sqrs[get_sqr_index(i, j)] &= ALL ^ available
-
-                updated = 1
-            else:
-                next_rem.append(index)
-
-
-        self.remeaning = list(next_rem)
-
-        return updated
+ 
 
     def set_all_forced(self):
         """
-        Calls set_forced until it stops making changes or the board is unsolvable
+        Sets all the tiles which have 1 possible value in one iteration throught the board
+        Until there are no changes made
         """
-        last_update = 1
-        while last_update == 1:
-            last_update = self.set_forced()
-            if last_update == 2:
-                return False
+        last_update = True
+        while last_update:
+            last_update = False
+            next_rem = []
+
+            for index in self.remeaning:
+                i, j = coord(index)
+                available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)]
+                
+                if not available:
+                    return False
+
+                if is_pow_2(available):
+                    self.board[index] = available
+                    self.rows[i] &= ALL ^ available
+                    self.cols[j] &= ALL ^ available
+                    self.sqrs[get_sqr_index(i, j)] &= ALL ^ available
+
+                    last_update = True
+                else:
+                    next_rem.append(index)
+
+            if last_update:
+                self.remeaning = next_rem
+
         return True
 
     def is_finished(self):
         """
         Returns True if all the tiles are set, False otherwise
         """
-        for i in self.board:
-            if i == 0:
-                return False
-        return True
+        return not all(self.board)
 
 def generate_sudoku():
     """
@@ -148,19 +134,16 @@ def generate_sudoku():
 def log2(n):
     """
     Returns 1 + log2(n) or 0
-    """
-    if n == 0:
-        return 0
-    else:
-        log = 0
-        while n != 1:
-            log += 1
-            n >>= 1
+    """    
+    log = 0
+    while n:
+        log += 1
+        n >>= 1
 
-        return 1 + log
+    return log
 
 def get_pow(n):
-    return 0 if n == 0 else 1 << (n - 1)
+    return 1 << (n - 1) if n else 0
 
 def index(i, j):
     return S * i + j
@@ -172,13 +155,13 @@ def get_sqr_index(i, j):
     return R*(i // R) + (j // R)
 
 def is_pow_2(v):
-    return (v & (v - 1)) == 0 and (v != 0)
+    return (v & (v - 1)) == 0
 
 def ls_of_possible(v):
     """
     Parses the possible values into a list of powers of 2
     """
-    return [1<<i for i in range(S) if (v & (1 << i)) != 0]
+    return [1<<i for i in range(S) if v & (1 << i)]
 
 def solve(sud):
     """
@@ -191,7 +174,7 @@ def solve(sud):
 
     if not is_pos:
         return False, None
-    elif sud.is_finished():
+    elif sud.remeaning == []:
         return True, sud
 
     index = sud.remeaning.pop()
@@ -216,7 +199,7 @@ def start(sud):
 
     if not is_pos:
         return False, None
-    elif sud.is_finished():
+    elif sud.remeaning == []:
         return True, sud
 
     index = sud.remeaning[-1]
@@ -236,7 +219,7 @@ def start(sud):
     result = pool.map(get_nxt, ls)
 
     clean = [res for (b,res) in result if b]
-    return clean[0] 
+    return clean[0] #There will always be a solution unless it is an impossible sudoku
 
 def get_nxt(three):
     new_sud, value, index = three
@@ -248,7 +231,9 @@ def get_nxt(three):
 def main():
     sudoku = generate_sudoku()
     print(sudoku)
+
     res = start(sudoku)
+
     print(res)
 
 

@@ -32,7 +32,7 @@ In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudok
   * **Rust P** -> 89ms, 100%
   * **C**      -> 89ms, 100%
   * **Python2** -> 9.8s, 11011%
-  * **Python3** -> 14.2s, 15955%
+  * **Python3** -> 13.2s, 15955%
   * **Cython** -> 1.2s, 1348%
   * **Haskell** -> 7.3s, 8426%
   * **Haskell P** -> 6.4s, 7191%
