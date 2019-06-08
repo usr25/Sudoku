@@ -17,9 +17,10 @@ $ `gcc -O3 -std=c11 -faggressive-loop-optimizations "dir/C/Sudoku.c" #Run the re
 
 $ `python3 "dir/Python/sudoku.py" #Can also be run with python2`
 
-$ `python2 "dir/Python/compiler.py"  #Requires Cython, check the [official website](https://cython.org/)`
+$ `python3 "dir/Python/compiler.py"  #Requires Cython, check the` [official website](https://cython.org/)
 
 $ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O2 improves performance x5`
+
 $ `ghc -O2 -optc-O3 -threaded "dir/Haskell/SudokuParallel.hs && ./SudokuParallel +RTS -N<Number of cores> -RTS` 
 
 ### Results
