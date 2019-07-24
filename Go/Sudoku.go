@@ -1,7 +1,7 @@
 package main
 
 //TODO: bits.OnesCount()
-import ("fmt";"strconv";"time";"os";"flag")
+import ("fmt";"strconv";"time";"os";"flag";"strings")
 
 
 /*------------------------CONST------------------------------*/
@@ -120,38 +120,36 @@ func isPow2(v Value) bool{
 
 func (self Sudoku) PrintSudoku(pretty bool) string{
 	/* String representation of the Sudoku. TODO: Implement it as a to_string() */
+	var builder strings.Builder
 	if ! pretty{
-		str := ""
 		for i := 0; i < SS; i++ {
-			str += strconv.Itoa(log2(self.board[i]))
+			builder.WriteString(strconv.Itoa(log2(self.board[i])))
 		}
-		return str
+		return builder.String()
 	}
-	str := "--------------------\n"
+	builder.WriteString("--------------------\n")
 	for i := 0; i < S; i++ {
-		sSmall := ""
 		for j := 0; j < S; j++ {
 
 			if self.board[index(i, j)] == 0{
-				sSmall += "- "
+				builder.WriteString("- ")
 			}else{
-				sSmall += strconv.Itoa(log2(self.board[index(i, j)])) + " "
+				builder.WriteString(strconv.Itoa(log2(self.board[index(i, j)])) + " ")
 			}
 
 			if j % R == R - 1{
-				sSmall += " "
+				builder.WriteString(" ")
 			}
 		}
 
-		str += sSmall
-		str += "\n"
+		builder.WriteString("\n")
 		
 		if i % R == R - 1 && i != S - 1{
-			str += "\n"
+			builder.WriteString("\n")
 		}
 	}
 
-	return str + "--------------------" + strconv.Itoa(self.filledTiles()) + "/" + strconv.Itoa(SS)
+	return builder.String() + "--------------------" + strconv.Itoa(self.filledTiles()) + "/" + strconv.Itoa(SS)
 }
 
 func (self Sudoku) filledTiles() int{
