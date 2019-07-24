@@ -59,3 +59,6 @@ In my computer old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudok
   * Concurrency isn't always an improvement: in Go it yields better results, in Python the same, and worse in Rust.
 
   * Some languages, such as C, benefit from using 64bit-integers while others, such as Rust, don't and even yield worse performance. This may be due to the native size of the CPU and being able to fit more in the cache making up for eachother
+
+### Thanks
+  Thanks to [BartMassey](github.com/BartMassey) for the popcount algorithms

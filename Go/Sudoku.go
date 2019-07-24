@@ -79,7 +79,7 @@ func Parse(s string) (sud Sudoku){
 /*---------------------HELPER------------------------*/
 
 func log2(v Value) int{
-	/* Returns 1 + log2(n) or 0*/
+	// Returns 1 + log2(n) or 0
 	if v == 0{
 		return 0
 	}else{
@@ -92,15 +92,13 @@ func log2(v Value) int{
 	}
 }
 
-func popCount(v Value) (pc int){
+//It is also possible use OnesCount from math/bits, but this is only available in version >=1.9
+func popCount(v Value) Value{
+	//The numbers are in octal
+	y := (v >> 1) & 033333333333
+    z := v - y - ((y >> 1) & 033333333333)
 
-	for i := uint(0); i < US; i++ {
-		if v & (1 << i) != 0{
-			pc++
-		}
-	}
-
-	return
+    return ((z + (z >> 3)) & 030707070707) % 63
 }
 
 func index(i, j int) int{
@@ -279,9 +277,9 @@ func updateOne(index int, s *Sudoku){
 	/* Removes board[index] from the possible values in its row / col / sqr */
 	i, j := coord(index)
 
-	s.rowsAv[i] &= ALL ^ s.board[index]
-	s.colsAv[j] &= ALL ^ s.board[index]
-	s.sqrsAv[getSqrIndex(i, j)] &= ALL ^ s.board[index]
+	s.rowsAv[i] &= ^s.board[index]
+	s.colsAv[j] &= ^s.board[index]
+	s.sqrsAv[getSqrIndex(i, j)] &= ^s.board[index]
 }
 
 
@@ -312,7 +310,7 @@ func setAllForced(s *Sudoku) bool{
 
 			if isPow2(available){
 				s.board[val] = available
-				mask = ALL ^ available
+				mask = ^available
 				
 				s.rowsAv[i] &= mask
 				s.colsAv[j] &= mask
@@ -455,21 +453,6 @@ func helper(s Sudoku) Sudoku{
 
 
 func main(){
-	/*
-	s := Parse()
-	fmt.Println(s.PrintSudoku())
-
-	start := time.Now()
-
-	s, ok, forcedChanges, calls := s.solveMain()
-
-	end := time.Now()
-
-	
-	fmt.Println(s.PrintSudoku())
-
-	fmt.Println("Is valid:", ok)
-	*/
 	test := flag.Bool("test", false, "The default 17 clue sudoku for benchmarking")
 	pretty := flag.Bool("pretty", false, "Draw the result as a pretty sudoku, use if a human is going to read the output")
 	info := flag.Bool("info", false, "Information about the time taken and the nodes")

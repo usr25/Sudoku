@@ -15,14 +15,12 @@ static mut CHANGES: u64 = 0;
 
 /*--------------------------HELPERS-----------------------------*/
 
-fn pop_count(mut v: Value) -> u32{
-    let mut pc: u32 = 0;
-    while v != 0{
-        pc += v & 1;
-        v >>= 1;
-    }
+#[inline(always)]
+fn pop_count(n: u32) -> u32{
+    let y = (n >> 1) & 0o33333333333;
+    let z = n - y - ((y >> 1) & 0o33333333333);
 
-    pc
+    ((z + (z >> 3)) & 0o30707070707) % 63
 }
 
 fn log2(mut v: Value) -> u8{
@@ -39,7 +37,7 @@ fn log2(mut v: Value) -> u8{
 }
 #[inline(always)]
 fn is_pow_2(v: Value) -> bool{
-	(v != 0) && (v & (v - 1) == 0)
+	v & (v - 1) == 0
 }
 #[inline(always)]
 fn index(i: usize, j: usize) -> usize{
@@ -187,7 +185,7 @@ impl Sudoku {
 
 	fn update(&mut self, index: usize){
 		let (i, j) = coord(index);
-		let mask = ALL ^ self.board[index];
+		let mask = ! self.board[index];
 
 		self.rows[i] &= mask;
 		self.cols[j] &= mask;
@@ -211,7 +209,7 @@ impl Sudoku {
 				if is_pow_2(available){
 					self.board[*index] = available;
 
-					let mask = ALL ^ available;
+					let mask = ! available;
 
 					self.rows[i] &= mask;
 					self.cols[j] &= mask;
@@ -359,18 +357,7 @@ fn gen_sudoku() -> Sudoku{
 		0, 0, 0,  4, 0, 0,  0, 2, 9,
 		0, 0, 0,  2, 0, 0,  3, 0, 0,
 		1, 0, 0,  0, 0, 0,  0, 0, 0]; //17
-	/*
-	let s: [Value; SS] =
-		[0, 0, 3,  0, 2, 9,  6, 0, 8,
-		6, 0, 0,  8, 0, 0,  0, 9, 0,
-		0, 9, 5,  4, 0, 6,  0, 0, 7,
-		1, 6, 0,  9, 3, 0,  8, 0, 4,
-		4, 0, 7,  0, 8, 0,  9, 0, 6,
-		9, 0, 8,  0, 4, 2,  0, 0, 0,
-		3, 0, 0,  2, 0, 4,  0, 6, 0,
-		0, 7, 0,  0, 0, 1,  0, 0, 5,
-		5, 0, 9,  7, 6, 0,  3, 1, 2];
-	*/
+        
 	let mut from_s: [Value;SS] = [0; SS];
 	let mut v: Vec<usize> = Vec::with_capacity(SS);
 

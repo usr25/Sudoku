@@ -177,7 +177,7 @@ impl Sudoku {
 
 	fn update(&mut self, index: usize){
 		let (i, j) = coord(index);
-		let mask = ALL ^ self.board[index];
+		let mask = ! self.board[index];
 
 		self.rows[i] &= mask;
 		self.cols[j] &= mask;
@@ -201,7 +201,7 @@ impl Sudoku {
 				if is_pow_2(available){
 					self.board[*index] = available;
 
-					let mask = ALL ^ available;
+					let mask = ! available;
 
 					self.rows[i] &= mask;
 					self.cols[j] &= mask;
