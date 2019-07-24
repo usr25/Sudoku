@@ -29,7 +29,7 @@ fn log2(mut v: Value) -> u8{
 }
 #[inline(always)]
 fn is_pow_2(v: Value) -> bool{
-	(v != 0) && (v & (v - 1) == 0)
+	v & (v - 1) == 0
 }
 #[inline(always)]
 fn index(i: usize, j: usize) -> usize{
@@ -57,8 +57,14 @@ struct Sudoku{
 }
 
 impl Sudoku {
-	fn print_sudoku(&self) -> String{
+	fn print_sudoku(&self, pretty: bool) -> String{
 		let mut string = String::with_capacity(SS * 2);
+		if ! pretty{
+			for i in 0..SS {
+				string.push((log2(self.board[i]) as u8 + '0' as u8) as char);
+			}
+			return string;
+		}
 		string.push_str("--------------------\n");
 
 		for i in 0..S_U {
@@ -267,41 +273,22 @@ impl Sudoku {
 
 /*-------------------------GENERATOR----------------------------*/
 
-fn gen_sudoku() -> Sudoku{
-	
-	let s: [Value; SS] = 
-		[0, 2, 4,  0, 0, 0,  0, 0, 0, 
-		0, 0, 0,  0, 0, 7,  1, 0, 0,
-		0, 9, 0,  0, 0, 0,  0, 0, 0,
-		0, 0, 0,  0, 0, 0,  0, 8, 4,
-		0, 0, 0,  0, 7, 5,  0, 0, 0,
-		6, 0, 0,  0, 3, 0,  0, 0, 0,
-		0, 0, 0,  4, 0, 0,  0, 2, 9,
-		0, 0, 0,  2, 0, 0,  3, 0, 0,
-		1, 0, 0,  0, 0, 0,  0, 0, 0]; //17
-	/*
-	let s: [Value; SS] =
-		[0, 0, 3,  0, 2, 9,  6, 0, 8,
-		6, 0, 0,  8, 0, 0,  0, 9, 0,
-		0, 9, 5,  4, 0, 6,  0, 0, 7,
-		1, 6, 0,  9, 3, 0,  8, 0, 4,
-		4, 0, 7,  0, 8, 0,  9, 0, 6,
-		9, 0, 8,  0, 4, 2,  0, 0, 0,
-		3, 0, 0,  2, 0, 4,  0, 6, 0,
-		0, 7, 0,  0, 0, 1,  0, 0, 5,
-		5, 0, 9,  7, 6, 0,  3, 1, 2];
-	*/
+//test: 024000000000007100090000000000000084000075000600030000000400029000200300100000000
+fn parse(s: &str) -> Sudoku{
 	let mut from_s: [Value;SS] = [0; SS];
 	let mut v: Vec<usize> = Vec::with_capacity(SS);
 
-	for i in 0..SS {
-		if s[i] == 0{
-			v.push(i);
+	let mut i: usize = 0;
+	for ch in s.bytes(){
+		let val = (ch - '0' as u8) as u64;
+		if val == 0{
+			v.push(i)
 		}else{
-			from_s[i] = 1 << (s[i] - 1);
+			from_s[i] = 1 << (val - 1);
 		}
+		i+=1
 	}
-
+	
 	v.shrink_to_fit();
 
 	Sudoku{
@@ -312,23 +299,43 @@ fn gen_sudoku() -> Sudoku{
 		remeaning: v}
 }
 
+fn solve_sud_from_str(s: &str, pretty: bool){
+	let mut s = parse(s);
+	s.set_possible();
+
+	let (_, res) = Sudoku::solve(s);
+	println!("{}", res.print_sudoku(pretty));
+}
 
 /*--------------------------MAIN-----------------------------*/
 
 fn main() {
-	let mut s = gen_sudoku();
-	s.set_possible();
+	use std::time::{Instant};
+	let now = Instant::now();
 
-	println!("{}", s.print_sudoku());
-	println!("{}, {}", s.is_valid(), s.filled_squares());
+	let args = std::env::args();
+	let mut info = false;
+	let mut pretty = false;
 	
-	let (_, res) = Sudoku::solve(s);
+	for arg in args {
+		match arg.as_ref() {
+			"-info" => info = true,
+			"-pretty" => pretty = true,
+			"-test" => solve_sud_from_str("024000000000007100090000000000000084000075000600030000000400029000200300100000000", pretty),
+			a => {
+				if a.len() == SS{
+					solve_sud_from_str(a, pretty);
+				};
+			}
+		}
+	}
 
-	println!("{}", res.print_sudoku());
-	println!("{}, {}", res.is_valid(), res.filled_squares());
-	
-	unsafe{
-		println!("Total changes: {:?}", CHANGES);
-		println!("Total nodes:   {:?}", NODES);
+	if info{
+		unsafe{
+			println!("Total changes: {:?}", CHANGES);
+			println!("Total nodes:   {:?}", NODES);
+		}
+		
+		println!("Time: {}ms", now.elapsed().subsec_millis());
 	}
 }

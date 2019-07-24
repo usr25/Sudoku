@@ -1,5 +1,7 @@
 //To compile the fastest version call $ rustc -O -C lto /.../Sudoku.rs
 
+#![allow(dead_code)]
+
 type Value = u32;
 type Pair = (bool, Sudoku);
 
@@ -65,33 +67,39 @@ struct Sudoku{
 }
 
 impl Sudoku {
-	fn print_sudoku(&self) -> String{
-		let mut string = String::with_capacity(SS * 2);
-		string.push_str("--------------------\n");
+	fn print_sudoku(&self, pretty: bool) -> String{
+        let mut string = String::with_capacity(SS * 2);
+        if ! pretty{
+            for i in 0..SS {
+                string.push((log2(self.board[i]) as u8 + '0' as u8) as char);
+            }
+            return string;
+        }
+        string.push_str("--------------------\n");
 
-		for i in 0..S_U {
-			for j in 0..S_U{
-				if self.board[index(i, j)] == 0{
-					string.push_str("- ");
-				}else{
-					let borrowed = log2(self.board[index(i, j)]).to_string();
-					string.push_str(&borrowed);
-					string.push(' ');
-				}
+        for i in 0..S_U {
+            for j in 0..S_U{
+                if self.board[index(i, j)] == 0{
+                    string.push_str("- ");
+                }else{
+                    let borrowed = log2(self.board[index(i, j)]).to_string();
+                    string.push_str(&borrowed);
+                    string.push(' ');
+                }
 
-				if j % R_U == R_U - 1{
-					string.push(' ');
-				}
-			}
-			string.push('\n');
-			if i % R_U == R_U - 1 && i != S_U - 1{
-				string.push('\n');
-			}
-		}
-		string.push_str("--------------------");
+                if j % R_U == R_U - 1{
+                    string.push(' ');
+                }
+            }
+            string.push('\n');
+            if i % R_U == R_U - 1 && i != S_U - 1{
+                string.push('\n');
+            }
+        }
+        string.push_str("--------------------");
 
-		string
-	}
+        string
+    }
 
 	fn filled_squares(&self) -> usize{
 		let mut t: usize = 0;
@@ -345,55 +353,68 @@ impl Sudoku {
 
 /*-------------------------GENERATOR----------------------------*/
 
-fn gen_sudoku() -> Sudoku{
-	
-	let s: [Value; SS] = 
-		[0, 2, 4,  0, 0, 0,  0, 0, 0, 
-		0, 0, 0,  0, 0, 7,  1, 0, 0,
-		0, 9, 0,  0, 0, 0,  0, 0, 0,
-		0, 0, 0,  0, 0, 0,  0, 8, 4,
-		0, 0, 0,  0, 7, 5,  0, 0, 0,
-		6, 0, 0,  0, 3, 0,  0, 0, 0,
-		0, 0, 0,  4, 0, 0,  0, 2, 9,
-		0, 0, 0,  2, 0, 0,  3, 0, 0,
-		1, 0, 0,  0, 0, 0,  0, 0, 0]; //17
-        
-	let mut from_s: [Value;SS] = [0; SS];
-	let mut v: Vec<usize> = Vec::with_capacity(SS);
+//test: 024000000000007100090000000000000084000075000600030000000400029000200300100000000
+fn parse(s: &str) -> Sudoku{
+    let mut from_s: [Value;SS] = [0; SS];
+    let mut v: Vec<usize> = Vec::with_capacity(SS);
 
-	for i in 0..SS {
-		if s[i] == 0{
-			v.push(i);
-		}else{
-			from_s[i] = 1 << (s[i] - 1);
-		}
-	}
+    let mut i: usize = 0;
+    for ch in s.bytes(){
+        let val = (ch - '0' as u8) as u64;
+        if val == 0{
+            v.push(i)
+        }else{
+            from_s[i] = 1 << (val - 1);
+        }
+        i+=1
+    }
+    
+    v.shrink_to_fit();
 
-	Sudoku{
-		board: from_s, 
-		cols: [ALL; S_U], 
-		rows: [ALL; S_U], 
-		sqrs: [ALL; S_U], 
-		remeaning: v}
+    Sudoku{
+        board: from_s, 
+        cols: [ALL; S_U], 
+        rows: [ALL; S_U], 
+        sqrs: [ALL; S_U], 
+        remeaning: v}
 }
 
+fn solve_sud_from_str(s: &str, pretty: bool){
+    let s = parse(s);
+
+    let res = Sudoku::start(s);
+    println!("{}", res.print_sudoku(pretty));
+}
 
 /*--------------------------MAIN-----------------------------*/
 
 fn main() {
+    use std::time::{Instant};
+    let now = Instant::now();
 
-    let s = gen_sudoku();
-    println!("{}", s.print_sudoku());
-    println!("{}, {}", s.is_valid(), s.filled_squares());
+    let args = std::env::args();
+    let mut info = false;
+    let mut pretty = false;
     
-    let res = Sudoku::start(s);
-
-    println!("{}", res.print_sudoku());
-    println!("{}, {}", res.is_valid(), res.filled_squares());
-    
-    unsafe{
-        println!("Total changes: {:?}", CHANGES);
-        println!("Total nodes:   {:?}", NODES);
+    for arg in args {
+        match arg.as_ref() {
+            "-info" => info = true,
+            "-pretty" => pretty = true,
+            "-test" => solve_sud_from_str("024000000000007100090000000000000084000075000600030000000400029000200300100000000", pretty),
+            a => {
+                if a.len() == SS{
+                    solve_sud_from_str(a, pretty);
+                };
+            }
+        }
     }
 
+    if info{
+        unsafe{
+            println!("Total changes: {:?}", CHANGES);
+            println!("Total nodes:   {:?}", NODES);
+        }
+        
+        println!("Time: {}ms", now.elapsed().subsec_millis());
+    }
 }
