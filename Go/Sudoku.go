@@ -1,7 +1,7 @@
 package main
 
 //TODO: bits.OnesCount()
-import ("fmt";"strconv";"time")
+import ("fmt";"strconv";"time";"os";"flag")
 
 
 /*------------------------CONST------------------------------*/
@@ -40,37 +40,40 @@ var remeaning [SS]int
 var counter int
 
 /*---------------------INITIALIZATION------------------------*/
+/* Test sudoku:
+"024000000
+ 000007100
+ 090000000
 
+ 000000084
+ 000075000
+ 600030000
 
-func GenSud() (s Sudoku){
-	/* Generates the sudoku, it is hard coded */
+ 000400029
+ 000200300
+ 100000000"
+*/
+
+func Parse(s string) (sud Sudoku){
+	//It is assumed that the str is of length 81
+	var e Value
 	temp_counter := 0
-	
-	sud := [S][S]Value{
-		{0, 2, 4,  0, 0, 0,  0, 0, 0},
-		{0, 0, 0,  0, 0, 7,  1, 0, 0},
-		{0, 9, 0,  0, 0, 0,  0, 0, 0},
-		{0, 0, 0,  0, 0, 0,  0, 8, 4},
-		{0, 0, 0,  0, 7, 5,  0, 0, 0},
-		{6, 0, 0,  0, 3, 0,  0, 0, 0},
-		{0, 0, 0,  4, 0, 0,  0, 2, 9},
-		{0, 0, 0,  2, 0, 0,  3, 0, 0},
-		{1, 0, 0,  0, 0, 0,  0, 0, 0}} //17
-
-	for i, l := range sud{
-		for j, e := range l{
+	for i := 0; i < S; i++ {
+		for j := 0; j < S; j++ {
+			e = Value(s[i * S + j] - '0')
 			if e == 0{
-				s.board[index(i, j)] = 0
+				sud.board[index(i, j)] = 0
 				remeaning[temp_counter] = index(i, j)
 				temp_counter++
 			}else{
-				s.board[index(i, j)] = 1 << uint(e - 1)
+				sud.board[index(i, j)] = 1 << uint(e - 1)
 			}
 		}
 	}
+
 	counter = temp_counter
 
-	return s
+	return
 }
 
 /*---------------------HELPER------------------------*/
@@ -117,8 +120,15 @@ func isPow2(v Value) bool{
 /*---------------------CHECKING------------------------*/
 
 
-func (self Sudoku) PrintSudoku() string{
+func (self Sudoku) PrintSudoku(pretty bool) string{
 	/* String representation of the Sudoku. TODO: Implement it as a to_string() */
+	if ! pretty{
+		str := ""
+		for i := 0; i < SS; i++ {
+			str += strconv.Itoa(log2(self.board[i]))
+		}
+		return str
+	}
 	str := "--------------------\n"
 	for i := 0; i < S; i++ {
 		sSmall := ""
@@ -445,8 +455,8 @@ func helper(s Sudoku) Sudoku{
 
 
 func main(){
-
-	s := GenSud()
+	/*
+	s := Parse()
 	fmt.Println(s.PrintSudoku())
 
 	start := time.Now()
@@ -458,8 +468,44 @@ func main(){
 	
 	fmt.Println(s.PrintSudoku())
 
-	fmt.Println("\nTotal changes:", forcedChanges)
-	fmt.Println("Total nodes:", calls)
 	fmt.Println("Is valid:", ok)
-	fmt.Println("Time:", end.Sub(start))
+	*/
+	test := flag.Bool("test", false, "The default 17 clue sudoku for benchmarking")
+	pretty := flag.Bool("pretty", false, "Draw the result as a pretty sudoku, use if a human is going to read the output")
+	info := flag.Bool("info", false, "Information about the time taken and the nodes")
+
+	flag.Parse()
+
+	start := time.Now()
+
+	var forcedChanges, calls int
+
+	if *test{
+		s := Parse("024000000000007100090000000000000084000075000600030000000400029000200300100000000")
+		s, _, fC_, c_ := s.solveMain()
+		fmt.Println(s.PrintSudoku(*pretty))
+
+		forcedChanges += fC_
+		calls += c_
+	}else{
+		args := os.Args[1:]
+		for i := 0; i < len(args); i++ {
+			if len(args[i]) != SS{
+				continue
+			}
+			s := Parse(args[i])
+			s, _, fC_, c_ := s.solveMain()
+			fmt.Println(s.PrintSudoku(*pretty))
+
+			forcedChanges += fC_
+			calls += c_
+		}
+	}
+
+	end := time.Now()
+	if *info{
+		fmt.Println("\nTotal changes:", forcedChanges)
+		fmt.Println("Total nodes:", calls)
+		fmt.Println("Time:", end.Sub(start))
+	}
 }
