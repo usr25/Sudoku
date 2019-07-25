@@ -28,16 +28,19 @@ Go and Rust implementations use command line arguments, use those to solve diffe
   * -info: Provide stats about the performance, such as time, nodes and changes
   * -pretty: Print the solved sudoku in a human readable way, otherwise it is printed as a string of numbers, it is user to parse in another program
 
-*Use example*:
-(Go is the prefered one since it is the most active and fast enough, otherwise use Rust or C, C doesnt have cmd line args implemented)
+**Use example**:
+
+Go is the prefered one since it is the most active and fast enough, otherwise use Rust or C, C doesnt have cmd line args implemented
 
 $ `go install "dir/Go/Sudoku.go" && $GOBIN/Sudoku -test -info -pretty` #Benchmarking
+
 $ `go install "dir/Go/Sudoku.go" && $GOBIN/Sudoku -info 00200..00013 014300..58900` #Solve multiple, pass each sudoku as a string of numbers with 0s for blank tiles, each sudoku has to be 81 characters long
 
-If there is no `-test` flag or sudokus the program will terminate, illegal sudokus will be printed as 0000..0000
+
+If there is no `-test` flag or sudokus the program will terminate. Illegal sudokus will be printed as 0000..0000
 
 ### Results
-In my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded, the proportions should stay the same regardless of the device
+This are measured in my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded. The proportions should stay the same regardless of the device
 (P stands for parallel)
 
   * **GO**     -> 299ms, 335%
