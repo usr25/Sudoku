@@ -59,9 +59,10 @@ class Sudoku(object):
         Removes the value in board[index] from the possible in its row / col / sqr
         """
         i, j = coord(index)
-        self.rows[i] &= ALL ^ self.board[index]
-        self.cols[j] &= ALL ^ self.board[index]
-        self.sqrs[get_sqr_index(i, j)] &= ALL ^ self.board[index]
+        val = ~ self.board[index]
+        self.rows[i] &= val
+        self.cols[j] &= val
+        self.sqrs[get_sqr_index(i, j)] &= val
  
 
     def set_all_forced(self):
@@ -83,9 +84,9 @@ class Sudoku(object):
 
                 if is_pow_2(available):
                     self.board[index] = available
-                    self.rows[i] &= ALL ^ available
-                    self.cols[j] &= ALL ^ available
-                    self.sqrs[get_sqr_index(i, j)] &= ALL ^ available
+                    self.rows[i] &= ~ available
+                    self.cols[j] &= ~ available
+                    self.sqrs[get_sqr_index(i, j)] &= ~ available
 
                     last_update = True
                 else:
@@ -107,15 +108,15 @@ def generate_sudoku():
     Generates the sudoku, so far it is hard coded
     """
     board = list(map(get_pow, 
-        [0, 2, 4,  0, 0, 0,  0, 0, 0, 
-        0, 0, 0,  0, 0, 7,  1, 0, 0,
-        0, 9, 0,  0, 0, 0,  0, 0, 0,
-        0, 0, 0,  0, 0, 0,  0, 8, 4,
-        0, 0, 0,  0, 7, 5,  0, 0, 0,
-        6, 0, 0,  0, 3, 0,  0, 0, 0,
-        0, 0, 0,  4, 0, 0,  0, 2, 9,
-        0, 0, 0,  2, 0, 0,  3, 0, 0,
-        1, 0, 0,  0, 0, 0,  0, 0, 0])) #17
+            [0, 2, 4,  0, 0, 0,  0, 0, 0, 
+            0, 0, 0,  0, 0, 7,  1, 0, 0,
+            0, 9, 0,  0, 0, 0,  0, 0, 0,
+            0, 0, 0,  0, 0, 0,  0, 8, 4,
+            0, 0, 0,  0, 7, 5,  0, 0, 0,
+            6, 0, 0,  0, 3, 0,  0, 0, 0,
+            0, 0, 0,  4, 0, 0,  0, 2, 9,
+            0, 0, 0,  2, 0, 0,  3, 0, 0,
+            1, 0, 0,  0, 0, 0,  0, 0, 0])) #17
 
     rows = [ALL] * S
     cols = [ALL] * S
@@ -155,7 +156,7 @@ def get_sqr_index(i, j):
     return R*(i // R) + (j // R)
 
 def is_pow_2(v):
-    return (v & (v - 1)) == 0
+    return not (v & (v - 1))
 
 def ls_of_possible(v):
     """
@@ -202,7 +203,7 @@ def start(sud):
     elif sud.remeaning == []:
         return True, sud
 
-    index = sud.remeaning[-1]
+    index = sud.remeaning[0]
 
     for rem_index in sud.remeaning:
         tpc = bin(sud.possible(rem_index)).count('1')

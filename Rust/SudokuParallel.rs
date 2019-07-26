@@ -251,26 +251,21 @@ impl Sudoku {
 		}else{
 
 			let index = s.remeaning.pop().expect("NO ELEMS");
-			let possible = s.possible(index);
-			let mut val: Value = 1;
+			let mut possible = s.possible(index);
 			
-			for _ in 0..S{
-				if val & possible == 0{
-					val <<= 1;
-					continue
-				}
-				let mut new_sud = s.clone();
+			while possible != 0{
+                let val = possible & (!possible + 1);
+                possible &= possible - 1;
+                let mut new_sud = s.clone();
 
-				new_sud.board[index] = val;
-				new_sud.update(index);
+                new_sud.board[index] = val;
+                new_sud.update(index);
 
-				let (pos, res) = Sudoku::solve(new_sud);
-				if pos{
-					return (true, res);
-				}
-
-				val <<= 1;
-			}
+                let (pos, res) = Sudoku::solve(new_sud);
+                if pos{
+                    return (true, res);
+                }
+            }
 		}
 
 		(false, s)
@@ -315,22 +310,17 @@ impl Sudoku {
             
             //spawn the threads
             thread::spawn(move || {
-                let possible = s.possible(index);
-                let mut val: Value = 1;
+                let mut possible = s.possible(index);
 
-                for _ in 0..S{
-                    if val & possible == 0{
-                        val <<= 1;
-                        continue
-                    }
+                while possible != 0{
+                    let val = possible & (! possible + 1);
+                    possible &= possible - 1;
                     let mut new_sud = s.clone();
 
                     new_sud.board[index] = val;
                     new_sud.update(index);
                     
                     tx.send(Sudoku::solve(new_sud)).unwrap();
-
-                    val <<= 1;
                 }
             });
 
@@ -388,22 +378,40 @@ fn solve_sud_from_str(s: &str, pretty: bool){
 
 /*--------------------------MAIN-----------------------------*/
 
+const HELP_TXT: &str = 
+"This is a Sudoku solver made by J
+Usage: ./Sudoku [ARGS] [SUDOKUS]...
+
+  -h, --help    Print help
+  -info         Provide information about the difficulty and time
+  -pretty       Draw the sudoku in a human readable way
+  -bench        Solve the benchmark sudoku, call with -info
+
+Each sudoku has to be a string of 81 numbers, 0s for blank tiles 00021..31000";
+
 fn main() {
-    use std::time::{Instant};
+    use std::time::Instant;
     let now = Instant::now();
 
     let args = std::env::args();
     let mut info = false;
     let mut pretty = false;
     
+    if args.len() == 1{
+        println!("Type -h for help");
+    }
+
     for arg in args {
         match arg.as_ref() {
+            "-h" | "--help" => println!("{}", HELP_TXT),
             "-info" => info = true,
             "-pretty" => pretty = true,
-            "-test" => solve_sud_from_str("024000000000007100090000000000000084000075000600030000000400029000200300100000000", pretty),
+            "-bench" => solve_sud_from_str("024000000000007100090000000000000084000075000600030000000400029000200300100000000", pretty),
             a => {
                 if a.len() == SS{
                     solve_sud_from_str(a, pretty);
+                }else if ! a.contains("Sudoku"){
+                    println!("\'{}\' is an unknown command, type -h to see all commands", a);
                 };
             }
         }

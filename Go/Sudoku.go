@@ -92,7 +92,7 @@ func log2(v Value) int{
 	}
 }
 
-//It is also possible use OnesCount from math/bits, but this is only available in version >=1.9
+//It is also possible use OnesCount from math/bits, but this is only available in version >= 1.9
 func popCount(v Value) Value{
 	//The numbers are in octal
 	y := (v >> 1) & 033333333333
@@ -285,7 +285,7 @@ func setAllForced(s *Sudoku) bool{
 	/* Calls set_forced until there are no more forced tiles.
 	 * Returns false if the board is unsolvable
 	 */
-	var i, j, m int
+	var i, j int
 	var val int
 	var available, mask Value
 
@@ -299,8 +299,7 @@ func setAllForced(s *Sudoku) bool{
 				continue
 			}
 			i, j = coord(val)
-			m = getSqrIndex(i, j)
-			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[m]
+			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[getSqrIndex(i, j)]
 
 			if available == 0{
 				return false
@@ -312,7 +311,7 @@ func setAllForced(s *Sudoku) bool{
 				
 				s.rowsAv[i] &= mask
 				s.colsAv[j] &= mask
-				s.sqrsAv[m] &= mask
+				s.sqrsAv[getSqrIndex(i, j)] &= mask
 
 				lastUpdate = true
 				
@@ -340,8 +339,7 @@ func (self Sudoku) solve() (bool, Sudoku){
 
 	if ! isPos{
 		return false, self
-	}
-	if self.finished(){
+	}else if self.finished(){
 		return true, self
 	}
 	
@@ -358,12 +356,9 @@ func (self Sudoku) solve() (bool, Sudoku){
 	}
 	*/
 	var allPos Value = self.possible(index)
-	var val Value = 1
-	for ; val < ALL; val <<= 1 {
-		if val & allPos == 0{
-			continue
-		}
-
+	for allPos != 0{
+		val := allPos & (^allPos + 1)
+		allPos &= allPos - 1
 		newS := Sudoku(self) //Duplicates s
 		newS.board[index] = val
 		updateOne(index, &newS)
@@ -387,6 +382,8 @@ func (self Sudoku) solveMain() (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*ca
 
 	if ! isPos{
 		return EMPTY, false, 0, 0
+	}else if self.finished(){
+		return self, true, len(remeaning), 0
 	}
 
 	//Find the first empty tile in the board
@@ -418,26 +415,25 @@ func (self Sudoku) solveMain() (Sudoku, /*ok*/ bool, /*forcedChanges*/ int, /*ca
 		}
 	}
 
+
 	ch := make(chan Sudoku, pc)
-	var val Value = 1
-	for ; val < ALL; val <<= 1 {
-		if val & allPos == 0{
-			continue
-		}
+	for allPos != 0 {
+		val := allPos & (^allPos + 1)
+		allPos &= allPos - 1
 
 		newS := Sudoku(self) //Duplicates self
 		newS.board[index] = val
 		updateOne(index, &newS)
-		
-		if newS.canBeFinished(){ //This reduces the number of branches by about 1/4
+
+		if newS.canBeFinished() { //This reduces the number of branches by about 1/4
 			ch <- helper(newS)
 		}
 	}
 	close(ch)
-
+	
 	for nxt := range ch{
 		if nxt != EMPTY{
-			ok := nxt.filledTiles() == SS && nxt.verifySudoku()
+			ok := nxt.filledTiles() == SS && nxt.verifySudoku()			
 			return nxt, ok, forcedChanges, calls
 		}
 	}
@@ -451,7 +447,7 @@ func helper(s Sudoku) Sudoku{
 
 
 func main(){
-	test := flag.Bool("test", false, "The default 17 clue sudoku for benchmarking")
+	bench := flag.Bool("bench", false, "The default 17 clue sudoku for benchmarking")
 	pretty := flag.Bool("pretty", false, "Draw the result as a pretty sudoku, use if a human is going to read the output")
 	info := flag.Bool("info", false, "Information about the time taken and the nodes")
 
@@ -461,7 +457,7 @@ func main(){
 
 	var forcedChanges, calls int
 
-	if *test{
+	if *bench{
 		s := Parse("024000000000007100090000000000000084000075000600030000000400029000200300100000000")
 		s, _, fC_, c_ := s.solveMain()
 		fmt.Println(s.PrintSudoku(*pretty))
@@ -475,18 +471,18 @@ func main(){
 				continue
 			}
 			s := Parse(args[i])
+			setPossible(&s)
 			s, _, fC_, c_ := s.solveMain()
 			fmt.Println(s.PrintSudoku(*pretty))
-
+			
 			forcedChanges += fC_
 			calls += c_
 		}
 	}
 
-	end := time.Now()
 	if *info{
 		fmt.Println("\nTotal changes:", forcedChanges)
 		fmt.Println("Total nodes:", calls)
-		fmt.Println("Time:", end.Sub(start))
+		fmt.Println("Time:", time.Now().Sub(start))
 	}
 }

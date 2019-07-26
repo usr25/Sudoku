@@ -143,12 +143,7 @@ solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySu
 main :: IO()
 main = do
 
-    let easy = fst $ solveParallel $ genSudoku vals_easy
-    let tree = fst $ solveParallel $ genSudoku vals_tree
     let r = fst $ solveParallel $ genSudoku vals_final
-
-    print $ isValid $ easy
-    print $ isValid $ tree
 
     startBool <- getCurrentTime
     putStrLn $ toStr $ r

@@ -1,11 +1,11 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
 
 #define R 3
 #define S 9
 #define ALL (1<<S) - 1
+#define log_2(ll) __builtin_ctz(ll)
 
 
 /*TO RUN:
@@ -59,7 +59,7 @@ int blanks_size = 0;
 
 /*--------------------------BOARD---------------------------*/
 Board generateSudoku(){
-    unsigned int values[9][9] = {
+    unsigned int values[S][S] = {
         {0,2,4, 0,0,0, 0,0,0},
         {0,0,0, 0,0,7, 1,0,0},
         {0,9,0, 0,0,0, 0,0,0},
@@ -81,7 +81,7 @@ Board generateSudoku(){
     
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
-            if (values[i][j] == 0){
+            if (! values[i][j]){
                 blanks[blanks_size++] = GET_CRD(i, j);
             }else{
                 board.values[i][j] = POS(values[i][j]);
@@ -98,7 +98,7 @@ void printBoard(Board board) {
 
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
-            if (board.values[i][j] == 0) {
+            if (! board.values[i][j]) {
                 printf(" - ");
             } else {
                 printf(" %d ", log_2(board.values[i][j]) + 1);
@@ -119,9 +119,9 @@ bool checkBoard(Board board) {
     for (int i = 0; i < S; i++) {
         row = 0;
         for (int j = 0; j < S; j++) {
-            if (board.values[i][j] != 0) {
+            if (board.values[i][j]) {
                 pos = board.values[i][j];
-                if ((pos & row) != 0) return false;
+                if (pos & row) return false;
                 row |= pos;
             }
         }
@@ -131,9 +131,9 @@ bool checkBoard(Board board) {
     for (int i = 0; i < S; i++) {
         col = 0;
         for (int j = 0; j < S; j++) {
-            if (board.values[j][i] != 0) {
+            if (board.values[j][i]) {
                 pos = board.values[j][i];
-                if ((pos & col) != 0) return false;
+                if (pos & col) return false;
                 col |= pos;
             }
         }
@@ -145,9 +145,9 @@ bool checkBoard(Board board) {
             sqr = 0;
             for (int k = i; k < i + R; k++) {
                 for (int l = j; l < j + R; l++) {
-                    if (board.values[k][l] != 0) {
+                    if (board.values[k][l]) {
                         pos = board.values[k][l];
-                        if ((pos & sqr) != 0) return false;
+                        if (pos & sqr) return false;
                         sqr |= pos;
                     }
                 }
@@ -161,7 +161,7 @@ bool checkBoard(Board board) {
 bool completeBoard(Board board) {
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
-            if (board.values[i][j] <= 0 || board.values[i][j] >= ALL) return false;
+            if (board.values[i][j] < 1 || board.values[i][j] >= ALL) return false;
         }
     }
     
@@ -176,29 +176,28 @@ bool finishedBoard(Board board) {
 
 bool dfs(Board *board, int index) {
     Board new_board;
-    int x, y;
     int state, new_index;
     
     // If all values are set, the recursion is finished
     if (index >= blanks_size) return true;
     
-    x = GET_X(blanks[index]);
-    y = GET_Y(blanks[index]);
+    int x = GET_X(blanks[index]);
+    int y = GET_Y(blanks[index]);
     
     // Goes to the next tile if the current one is already set
-    if (board->values[y][x] != 0)
+    if (board->values[y][x])
         return dfs(board, index+1);
     
     unsigned int possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[GET_SQR(y, x)];
 
-    for (int v = 1; v < ALL; v <<= 1)
+    while (possible)
     {
-        if (!(v & possible))
-            continue;
+        unsigned int v = possible & (-possible);
+        possible &= possible - 1;
         // Generates a new copy of the board to improve performance
         new_board = *board;
         new_board.values[y][x] = v;
-        new_index = index+1;
+        new_index = index + 1;
         
         // Removes the picked value from the possible ones
         updateTileAdded(&new_board, y, x);
@@ -228,7 +227,7 @@ void calculatePossible(Board *board) {
     // Goes tile by tile and saves all the found values
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
-            if (board->values[i][j] != 0) {
+            if (board->values[i][j]) {
                 m = GET_SQR(i,j);
                 pos = board->values[i][j];
                 
@@ -251,12 +250,11 @@ void calculatePossible(Board *board) {
  * tile that was changed.
  */
 void updateTileAdded(Board *board, const char y, const char x) {
-    int val = ALL ^ board->values[y][x];
-    int m = GET_SQR(y,x);
+    int val = ~board->values[y][x];
     
     board->rowsPos[y] &= val;
     board->colsPos[x] &= val;
-    board->sqrsPos[m] &= val;
+    board->sqrsPos[GET_SQR(y,x)] &= val;
 }
 
 /* Sets all the tiles that only have one possible value.
@@ -267,17 +265,16 @@ void updateTileAdded(Board *board, const char y, const char x) {
  *  any other value if no modifications were made
  */
 char setAllForced(Board *board, int min) {
-    int x, y, m;
+    int x, y;
     int possible;
     char state = 0;
 
-    for (int i = min; i < blanks_size && state != 2; i++) {
+    for (int i = min; state != 2 && i < blanks_size; i++) {
         x = GET_X(blanks[i]);
         y = GET_Y(blanks[i]);
         
-        if (board->values[y][x] == 0) {
-        	m = GET_SQR(y, x);
-        	possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[m];
+        if (! board->values[y][x]) {
+        	possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[GET_SQR(y, x)];
             state = 2 - __builtin_popcount(possible);
 
             if (state == 1) {
@@ -289,13 +286,6 @@ char setAllForced(Board *board, int min) {
     
     return state;
 }
-
-int log_2(int index) {
-    int val = 0;
-    while (index >>= 1) ++val;
-    return val;
-}
-
 
 void solve(Board *board) {
     calculatePossible(board);
@@ -320,5 +310,5 @@ int main(int argc, char const *argv[])
     printf("Is valid: "); printf((finishedBoard(b)) ? "true\n" : "false\n");
     printf("Time: %ldms\n", (end - start)/1000);
 
-    return (EXIT_SUCCESS);
+    return 0;
 }

@@ -6,31 +6,34 @@ O(_n_ ^_m_) algorithm, where _n_ is the number of empty tiles and _m_ the possib
 ### Use
 _Requires go, rustc, gcc, python2/3, Cython and ghc. Other compilers may yield different results_
 
+There are compiled files in /Linux
 
-Place the files in a directory "dir"
+cd into Sudoku/
 
-$ `go install "dir/Go/Sudoku.go"  #Binary should be placed in GOBIN, if it is not set type $export GOBIN=dirname or refer to the` [go installation guide](https://golang.org/doc/install)
+$ `go install Go/Sudoku.go  #Binary should be placed in GOBIN, if it is not set type $export GOBIN=dirname or refer to the` [go installation guide](https://golang.org/doc/install)
 
-$ `rustc -O "dir/Rust/Sudoku.rs"  #Run the resulting binary file in $pwd`
+$ `rustc -O dir/Rust/Sudoku.rs`
 
-$ `gcc -O3 -std=c11 -faggressive-loop-optimizations "dir/C/Sudoku.c" #Run the resulting binary in $pwd`
+$ `gcc -O3 -std=c11 -faggressive-loop-optimizations C/Sudoku.c`
 
-$ `python3 "dir/Python/sudoku.py" #Can also be run with python2`
+$ `python3 Python/sudoku.py #Can also be run with python2`
 
-$ `python3 "dir/Python/compiler.py"  #Requires Cython, check the` [official website](https://cython.org/)
+$ `python3 Python/compiler.py  #Requires Cython, check the` [official website](https://cython.org/)
 
-$ `ghc -O2 -optc-O3 "dir/Haskell/SudokuMain.hs #-O2 improves performance x5`
+$ `cd Haskell && ghc -O2 -optc-O3 SudokuMain.hs #-O2 improves performance x5`
 
-$ `ghc -O2 -optc-O3 -threaded "dir/Haskell/SudokuParallel.hs && ./SudokuParallel +RTS -N<Number of cores> -RTS` 
+$ `cd Haskell && ghc -O2 -optc-O3 -threaded SudokuParallel.hs && ./SudokuParallel +RTS -N<Number of cores> -RTS`
 
 Go and Rust implementations use command line arguments, use those to solve different sudokus
-  * -test: Solve the hard-coded sudoku, for benchmarking purposes
+  * -bench: Solve the hard-coded sudoku, for benchmarking purposes
   * -info: Provide stats about the performance, such as time, nodes and changes
   * -pretty: Print the solved sudoku in a human readable way, otherwise it is printed as a string of numbers, it is user to parse in another program
 
 **Use example**:
 
-Go is the prefered one since it is the most active and fast enough, otherwise use Rust or C, C doesnt have cmd line args implemented
+Use Rust / Go implementation, since they are the most active and have cmd line args, Rust without parallelization is the fastest and most stable. Run the binaries or execute:
+
+$ `rustc -O "dir/Rust/Sudoku.rs" && ./Sudoku -info -pretty 00200..00013 014300..58900` #Preferred
 
 $ `go install "dir/Go/Sudoku.go" && $GOBIN/Sudoku -test -info -pretty` #Benchmarking
 
@@ -43,15 +46,15 @@ If there is no `-test` flag or sudokus the program will terminate. Illegal sudok
 This are measured in my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded. The proportions should stay the same regardless of the device
 (P stands for parallel)
 
-  * **GO**     -> 299ms, 335%
-  * **Rust**   -> 85ms, 95%
-  * **Rust P** -> 89ms, 100%
+  * **GO**     -> 295ms, 330%
+  * **Rust**   -> 81ms, 91%
+  * **Rust P** -> 85ms, 95%
   * **C**      -> 89ms, 100%
-  * **Python2** -> 9.8s, 11011%
-  * **Python3** -> 13.2s, 15955%
+  * **Python2** -> 8.9s, 10100%
+  * **Python3** -> 11.0s, 12395%
   * **Cython** -> 1.2s, 1348%
-  * **Haskell** -> 7.3s, 8426%
-  * **Haskell P** -> 6.4s, 7191%
+  * **Haskell** -> 7.2s, 8089%
+  * **Haskell P** -> 6.2s, 6966%
 
 ### Algorithm
   Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
@@ -72,7 +75,7 @@ This are measured in my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
 
   * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, and the abundant use of integers in the sudoku
 
-  * Concurrency isn't always an improvement: in Go it yields better results, in Python the same, and worse in Rust.
+  * Concurrency isn't always an improvement: in Go / Haskell it yields better results, in Python the same, and worse in Rust.
 
   * Some languages, such as C, benefit from using 64bit-integers while others, such as Rust, don't and even yield worse performance. This may be due to the native size of the CPU and being able to fit more in the cache making up for eachother
 

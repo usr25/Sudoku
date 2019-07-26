@@ -123,12 +123,7 @@ solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) e
 main :: IO()
 main = do
 
-    let easy = fst $ solveRecursively $ genSudoku vals_easy
-    let tree = fst $ solveRecursively $ genSudoku vals_tree
     let r = fst $ solveRecursively $ genSudoku vals_final
-
-    print $ isValid $ easy
-    print $ isValid $ tree
 
     startBool <- getCurrentTime
     putStrLn $ toStr $ r
