@@ -273,8 +273,9 @@ fn parse(s: &str) -> Sudoku{
 	let mut v: Vec<usize> = Vec::with_capacity(SS);
 
 	let mut i: usize = 0;
-	for ch in s.bytes(){
-		let val = (ch - '0' as u8) as u64;
+	
+	for ch in s.chars(){
+		let val = ch.to_digit(10).unwrap();
 		if val == 0{
 			v.push(i)
 		}else{
@@ -282,7 +283,7 @@ fn parse(s: &str) -> Sudoku{
 		}
 		i+=1
 	}
-	
+
 	v.shrink_to_fit();
 
 	Sudoku{
