@@ -444,7 +444,9 @@ func main() {
 
 	var forcedChanges, calls int
 
-	if *bench {
+	if len(os.Args) <= 1 {
+		fmt.Println("Type -h for help")
+	} else if *bench {
 		s := Parse("024000000000007100090000000000000084000075000600030000000400029000200300100000000")
 		s, _, fC_, c_ := s.solveMain()
 		fmt.Println(s.PrintSudoku(*pretty))
