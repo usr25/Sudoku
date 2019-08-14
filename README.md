@@ -43,11 +43,11 @@ $ `go install "dir/Go/Sudoku.go" && $GOBIN/Sudoku -info 00200..00013 014300..589
 If there is no `-test` flag or sudokus the program will terminate. Illegal sudokus will be printed as 0000..0000
 
 ### Results
-This are measured in my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded. The proportions should stay the same regardless of the device
+This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded. The proportions should stay the same regardless of the device
 (P stands for parallel)
 
-  * **GO**     -> 295ms, 330%
-  * **Rust**   -> 81ms, 91%
+  * **GO**     -> 120ms, 134%
+  * **Rust**   -> 80ms, 89%
   * **Rust P** -> 85ms, 95%
   * **C**      -> 89ms, 100%
   * **Python2** -> 8.9s, 10100%
@@ -57,8 +57,6 @@ This are measured in my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
   * **Haskell P** -> 6.2s, 6966%
 
 ### Algorithm
-  Note that in order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
-
   The possible values for each square are the intersection of the possible values in its row / col / sqr
 
   1. Generate 3 arrays with the possible values for each row / col / square. (An empty row should have all possible values and a full one, zero)
@@ -69,8 +67,11 @@ This are measured in my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
 
   4. Else: Select a tile and, for each value, try to solve the sudoku by making a duplicates and assigning one of the possible values, goto (2.)
 
+  This algorithm is equivalent to traversing a tree in a DFS fashion, the input sudoku is the root and the leafs are solved sudokus or impossible sudokus, each branch is a choice, when there is only 1 branch it is forced, when there are more it is needed to traverse first one and then the other.
 
 ### Notes
+  * In order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
+
   * Solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy and suboptimal code). The Haskell implementation involves a lot of unnecessary copying / writing.
 
   * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, and the abundant use of integers in the sudoku

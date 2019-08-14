@@ -7,299 +7,296 @@ const S: Value = 9;
 const ALL: Value = (1 << S) - 1;
 const R_U: usize = R as usize;
 const S_U: usize = S as usize;
-const SS: usize = S_U*S_U;
+const SS: usize = S_U * S_U;
 
-static mut NODES: u64 =  0;
+static mut NODES: u64 = 0;
 static mut CHANGES: u64 = 0;
-
 
 /*--------------------------HELPERS-----------------------------*/
 
-fn log2(mut v: Value) -> u8{
-	if v == 0{
-		0
-	}else{
-		let mut log = 0u8;
-		while v != 1{
-			log += 1;
-			v >>=1;
-		}
-		1 + log
-	}
+fn log2(mut v: Value) -> u8 {
+    if v == 0 {
+        0
+    } else {
+        let mut log = 0u8;
+        while v != 1 {
+            log += 1;
+            v >>= 1;
+        }
+        1 + log
+    }
 }
 #[inline(always)]
-fn is_pow_2(v: Value) -> bool{
-	v & (v - 1) == 0
+fn is_pow_2(v: Value) -> bool {
+    v & (v - 1) == 0
 }
 #[inline(always)]
-fn index(i: usize, j: usize) -> usize{
-	S_U * i + j
+fn index(i: usize, j: usize) -> usize {
+    S_U * i + j
 }
 #[inline(always)]
-fn coord(i: usize) -> (usize, usize){
-	(i/S_U, i % S_U)
+fn coord(i: usize) -> (usize, usize) {
+    (i / S_U, i % S_U)
 }
 #[inline(always)]
-fn get_sqr_index(i: usize, j: usize) -> usize{
-	R_U*(i/R_U) + (j/R_U)
+fn get_sqr_index(i: usize, j: usize) -> usize {
+    R_U * (i / R_U) + (j / R_U)
 }
-
 
 /*--------------------------SUDOKU-----------------------------*/
 
 #[derive(Clone)]
-struct Sudoku{
-	board: [Value; SS],
-	cols: [Value; S_U],
-	rows: [Value; S_U],
-	sqrs: [Value; S_U],
-	remeaning: Vec<usize>,
+struct Sudoku {
+    board: [Value; SS],
+    cols: [Value; S_U],
+    rows: [Value; S_U],
+    sqrs: [Value; S_U],
+    remeaning: Vec<usize>,
 }
 
 impl Sudoku {
-	fn print_sudoku(&self, pretty: bool) -> String{
-		let mut string = String::with_capacity(SS * 2);
-		if ! pretty{
-			for i in 0..SS {
-				string.push((log2(self.board[i]) as u8 + '0' as u8) as char);
-			}
-			return string;
-		}
-		string.push_str("--------------------\n");
+    //test: 024000000000007100090000000000000084000075000600030000000400029000200300100000000
+    fn parse(s: &str) -> Sudoku {
+        let mut from_s: [Value; SS] = [0; SS];
+        let mut v: Vec<usize> = Vec::with_capacity(SS);
 
-		for i in 0..S_U {
-			for j in 0..S_U{
-				if self.board[index(i, j)] == 0{
-					string.push_str("- ");
-				}else{
-					let borrowed = log2(self.board[index(i, j)]).to_string();
-					string.push_str(&borrowed);
-					string.push(' ');
-				}
+        let mut i: usize = 0;
 
-				if j % R_U == R_U - 1{
-					string.push(' ');
-				}
-			}
-			string.push('\n');
-			if i % R_U == R_U - 1 && i != S_U - 1{
-				string.push('\n');
-			}
-		}
-		string.push_str("--------------------");
+        for ch in s.chars() {
+            let val = ch.to_digit(10).unwrap();
+            if val == 0 {
+                v.push(i)
+            } else {
+                from_s[i] = 1 << (val - 1);
+            }
+            i += 1
+        }
 
-		string
-	}
+        v.shrink_to_fit();
 
-	fn filled_squares(&self) -> usize{
-		let mut t: usize = 0;
-		for i in 0..SS {
-			if self.board[i] != 0{
-				t += 1;
-			}
-		}
-		t
-	}
+        Sudoku {
+            board: from_s,
+            cols: [ALL; S_U],
+            rows: [ALL; S_U],
+            sqrs: [ALL; S_U],
+            remeaning: v,
+        }
+    }
 
-	fn is_valid(&self) -> bool{
-		if self.filled_squares() != SS{
-			return false;
-		}
+    fn solve_from_str(s: &str, pretty: bool) {
+        let mut s = Sudoku::parse(s);
+        s.set_possible();
 
-		let mut sum;
+        let (_, res) = Sudoku::solve(s);
+        println!("{}", res.print_sudoku(pretty));
+    }
 
-		//Rows
-		for i in 0..S_U {
-			sum = 0;
-			for j in 0..S_U {
-				if sum & self.board[index(i, j)] != 0{
-					return false;
-				}
-				sum += self.board[index(i, j)];
-			}
+    fn print_sudoku(&self, pretty: bool) -> String {
+        let mut string = String::with_capacity(SS * 2);
+        if !pretty {
+            for i in 0..SS {
+                string.push((log2(self.board[i]) as u8 + '0' as u8) as char);
+            }
+            return string;
+        }
+        string.push_str("--------------------\n");
 
-			if sum != ALL{
-				return false;
-			}
-		}
+        for i in 0..S_U {
+            for j in 0..S_U {
+                if self.board[index(i, j)] == 0 {
+                    string.push_str("- ");
+                } else {
+                    let borrowed = log2(self.board[index(i, j)]).to_string();
+                    string.push_str(&borrowed);
+                    string.push(' ');
+                }
 
-		//Cols
-		for i in 0..S_U {
-			sum = 0;
-			for j in 0..S_U {
-				if sum & self.board[index(j, i)] != 0{
-					return false;
-				}
-				sum += self.board[index(j, i)];
-			}
+                if j % R_U == R_U - 1 {
+                    string.push(' ');
+                }
+            }
+            string.push('\n');
+            if i % R_U == R_U - 1 && i != S_U - 1 {
+                string.push('\n');
+            }
+        }
+        string.push_str("--------------------");
 
-			if sum != ALL{
-				return false;
-			}
-		}
+        string
+    }
 
-		//Sqrs
-		for x in 0..R_U {
-			for y in 0..R_U {
-				sum = 0;
-				for i in 0..R_U {
-					for j in 0..R_U{
-						if sum & self.board[index(R_U*x + i, R_U*y + j)] != 0{
-							return false;
-						}
-						sum += self.board[index(R_U*x + i, R_U*y + j)];
-					}
-				}
-				if sum != ALL{
-					return false;
-				}
-			}
-		}
+    fn filled_squares(&self) -> usize {
+        let mut t: usize = 0;
+        for i in 0..SS {
+            if self.board[i] != 0 {
+                t += 1;
+            }
+        }
+        t
+    }
 
-		true
-	}
+    fn is_valid(&self) -> bool {
+        if self.filled_squares() != SS {
+            return false;
+        }
 
-	fn possible(&self, index: usize) -> Value{
-		let i = index / S_U;
-		let j = index % S_U;
+        let mut sum;
 
-		self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)]
-	}
+        //Rows
+        for i in 0..S_U {
+            sum = 0;
+            for j in 0..S_U {
+                if sum & self.board[index(i, j)] != 0 {
+                    return false;
+                }
+                sum += self.board[index(i, j)];
+            }
 
+            if sum != ALL {
+                return false;
+            }
+        }
 
-	fn set_possible(&mut self){
-		let mut val;
+        //Cols
+        for i in 0..S_U {
+            sum = 0;
+            for j in 0..S_U {
+                if sum & self.board[index(j, i)] != 0 {
+                    return false;
+                }
+                sum += self.board[index(j, i)];
+            }
 
-		for i in 0..S_U {
-			for j in 0..S_U {
-				
-				val = self.board[index(i, j)];
-				self.rows[i] ^= val;
-				self.cols[j] ^= val;
-				self.sqrs[get_sqr_index(i, j)] ^= val;
-			}
-		}
-	}
+            if sum != ALL {
+                return false;
+            }
+        }
 
-	fn update(&mut self, index: usize){
-		let (i, j) = coord(index);
-		let mask = ! self.board[index];
+        //Sqrs
+        for x in 0..R_U {
+            for y in 0..R_U {
+                sum = 0;
+                for i in 0..R_U {
+                    for j in 0..R_U {
+                        if sum & self.board[index(R_U * x + i, R_U * y + j)] != 0 {
+                            return false;
+                        }
+                        sum += self.board[index(R_U * x + i, R_U * y + j)];
+                    }
+                }
+                if sum != ALL {
+                    return false;
+                }
+            }
+        }
 
-		self.rows[i] &= mask;
-		self.cols[j] &= mask;
-		self.sqrs[get_sqr_index(i, j)] &= mask;
-	}
+        true
+    }
 
-	fn set_all_forced(&mut self) -> bool{
-		let mut last_updated = true;
-		
-		while last_updated{
-			last_updated = false;
-			let mut next_remeaning: Vec<usize> = Vec::with_capacity(self.remeaning.len());
+    fn possible(&self, index: usize) -> Value {
+        let i = index / S_U;
+        let j = index % S_U;
 
-			for index in self.remeaning.iter() {
-				let (i, j) = coord(*index);
-				let available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)];
+        self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)]
+    }
 
-				if available == 0{
-					return false;
-				}
-				if is_pow_2(available){
-					self.board[*index] = available;
+    fn set_possible(&mut self) {
+        let mut val;
 
-					let mask = ! available;
+        for i in 0..S_U {
+            for j in 0..S_U {
+                val = self.board[index(i, j)];
+                self.rows[i] ^= val;
+                self.cols[j] ^= val;
+                self.sqrs[get_sqr_index(i, j)] ^= val;
+            }
+        }
+    }
 
-					self.rows[i] &= mask;
-					self.cols[j] &= mask;
-					self.sqrs[get_sqr_index(i, j)] &= mask;
+    fn update(&mut self, index: usize) {
+        let (i, j) = coord(index);
+        let mask = !self.board[index];
 
-					last_updated = true;
+        self.rows[i] &= mask;
+        self.cols[j] &= mask;
+        self.sqrs[get_sqr_index(i, j)] &= mask;
+    }
 
-					unsafe{CHANGES += 1;}
-				}else{
-					next_remeaning.push(*index);
-				}
+    fn set_all_forced(&mut self) -> bool {
+        let mut last_updated = true;
 
-			}
-			if last_updated{
-				self.remeaning = next_remeaning;
-			}
-		}
+        while last_updated {
+            last_updated = false;
+            let mut next_remeaning: Vec<usize> = Vec::with_capacity(self.remeaning.len());
 
-		true
-	}
+            for index in self.remeaning.iter() {
+                let (i, j) = coord(*index);
+                let available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)];
 
-	fn solve(mut s: Sudoku) -> (bool, Sudoku){
-		unsafe {NODES += 1;}
+                if available == 0 {
+                    return false;
+                }
+                if is_pow_2(available) {
+                    self.board[*index] = available;
 
-		if s.remeaning.len() == 0{
-			return (true, s);
-		}
+                    let mask = !available;
 
-		let is_pos = s.set_all_forced();
+                    self.rows[i] &= mask;
+                    self.cols[j] &= mask;
+                    self.sqrs[get_sqr_index(i, j)] &= mask;
 
-		if ! is_pos{
-			return (false, s);
-		}else if s.remeaning.len() == 0{
-			return (true, s);
-		}else{
+                    last_updated = true;
 
-			let index = s.remeaning.pop().expect("NO ELEMS");
-			let mut possible = s.possible(index);
-			
-			while possible != 0{
-				let val = possible & (!possible + 1);
-				possible &= possible - 1;
-				let mut new_sud = s.clone();
+                    unsafe {
+                        CHANGES += 1;
+                    }
+                } else {
+                    next_remeaning.push(*index);
+                }
+            }
+            if last_updated {
+                self.remeaning = next_remeaning;
+            }
+        }
 
-				new_sud.board[index] = val;
-				new_sud.update(index);
+        true
+    }
 
-				let (pos, res) = Sudoku::solve(new_sud);
-				if pos{
-					return (true, res);
-				}
-			}
-		}
-		(false, s)
-	}
-}
+    fn solve(mut s: Sudoku) -> (bool, Sudoku) {
+        unsafe {
+            NODES += 1;
+        }
 
-/*-------------------------GENERATOR----------------------------*/
+        if s.remeaning.len() == 0 {
+            return (true, s);
+        }
 
-//test: 024000000000007100090000000000000084000075000600030000000400029000200300100000000
-fn parse(s: &str) -> Sudoku{
-	let mut from_s: [Value;SS] = [0; SS];
-	let mut v: Vec<usize> = Vec::with_capacity(SS);
+        let is_pos = s.set_all_forced();
 
-	let mut i: usize = 0;
-	
-	for ch in s.chars(){
-		let val = ch.to_digit(10).unwrap();
-		if val == 0{
-			v.push(i)
-		}else{
-			from_s[i] = 1 << (val - 1);
-		}
-		i+=1
-	}
+        if !is_pos {
+            return (false, s);
+        } else if s.remeaning.len() == 0 {
+            return (true, s);
+        } else {
+            let index = s.remeaning.pop().expect("NO ELEMS");
+            let mut possible = s.possible(index);
 
-	v.shrink_to_fit();
+            while possible != 0 {
+                let val = possible & (!possible + 1);
+                possible &= possible - 1;
+                let mut new_sud = s.clone();
 
-	Sudoku{
-		board: from_s, 
-		cols: [ALL; S_U], 
-		rows: [ALL; S_U], 
-		sqrs: [ALL; S_U], 
-		remeaning: v}
-}
+                new_sud.board[index] = val;
+                new_sud.update(index);
 
-fn solve_sud_from_str(s: &str, pretty: bool){
-	let mut s = parse(s);
-	s.set_possible();
-
-	let (_, res) = Sudoku::solve(s);
-	println!("{}", res.print_sudoku(pretty));
+                let (pos, res) = Sudoku::solve(new_sud);
+                if pos {
+                    return (true, res);
+                }
+            }
+        }
+        (false, s)
+    }
 }
 
 /*--------------------------MAIN-----------------------------*/
@@ -316,39 +313,45 @@ Usage: ./Sudoku [ARGS] [SUDOKUS]...
 Each sudoku has to be a string of 81 numbers, 0s for blank tiles 00021..31000";
 
 fn main() {
-	use std::time::Instant;
-	let now = Instant::now();
+    use std::time::Instant;
+    let now = Instant::now();
 
-	let args = std::env::args();
-	let mut info = false;
-	let mut pretty = false;
-	
-	if args.len() == 1{
-		println!("Type -h for help");
-	}
+    let args = std::env::args();
+    let mut info = false;
+    let mut pretty = false;
 
-	for arg in args {
-		match arg.as_ref() {
-			"-h" | "--help" => println!("{}", HELP_TXT),
-			"-info" => info = true,
-			"-pretty" => pretty = true,
-			"-bench" => solve_sud_from_str("024000000000007100090000000000000084000075000600030000000400029000200300100000000", pretty),
-			a => {
-				if a.len() == SS{
-					solve_sud_from_str(a, pretty);
-				}else if ! a.contains("Sudoku"){
-					println!("\'{}\' is an unknown command, type -h to see all commands", a);
-				};
-			}
-		}
-	}
+    if args.len() == 1 {
+        println!("Type -h for help");
+    }
 
-	if info{
-		unsafe{
-			println!("Total changes: {:?}", CHANGES);
-			println!("Total nodes:   {:?}", NODES);
-		}
-		
-		println!("Time: {}ms", now.elapsed().subsec_millis());
-	}
+    for arg in args {
+        match arg.as_ref() {
+            "-h" | "--help" => println!("{}", HELP_TXT),
+            "-info" => info = true,
+            "-pretty" => pretty = true,
+            "-bench" => Sudoku::solve_from_str(
+                "024000000000007100090000000000000084000075000600030000000400029000200300100000000",
+                pretty,
+            ),
+            a => {
+                if a.len() == SS {
+                    Sudoku::solve_from_str(a, pretty);
+                } else if !a.contains("Sudoku") {
+                    println!(
+                        "\'{}\' is an unknown command, type -h to see all commands",
+                        a
+                    );
+                };
+            }
+        }
+    }
+
+    if info {
+        unsafe {
+            println!("Total changes: {:?}", CHANGES);
+            println!("Total nodes:   {:?}", NODES);
+        }
+
+        println!("Time: {}ms", now.elapsed().subsec_millis());
+    }
 }
