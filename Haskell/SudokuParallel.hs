@@ -32,7 +32,7 @@ vals_tree =
         [5, 0, 9,  7, 6, 0,  3, 0, 0]]
 
 vals_final = 
-        [[0, 2, 4,  0, 0, 0,  0, 0, 0], 
+        [[0, 2, 4,  0, 0, 0,  0, 0, 0],
         [0, 0, 0,  0, 0, 7,  1, 0, 0],
         [0, 9, 0,  0, 0, 0,  0, 0, 0],
         [0, 0, 0,  0, 0, 0,  0, 8, 4],
@@ -54,31 +54,28 @@ vals_impossible = --It should return sudokuEMPTY and False when checked with isV
         [0, 0, 0,  0, 0, 0,  0, 0, 0]]
 
 
---Calls setForced while setForced makes changes
-setAllForced :: Sudoku -> Sudoku
-setAllForced sud = if somethingChanged then setAllForced next else next
-    where
-        (next, somethingChanged) = setForced sud
-
 --Sets all the forced values for a sudoku. 
 --eg.: The only possible value in a tile is 1, it sets the value as 1 
-setForced :: Sudoku -> (Sudoku, Bool)
-setForced (Sudoku vs rest rows cols sqrs) = (Sudoku (updateVs vs totalChanges 0) finalRemeaning finalR finalC finalS, not (null totalChanges)) 
+setForced :: Sudoku -> Sudoku
+setForced (Sudoku vs rest rows cols sqrs) = Sudoku (updateVs vs totalChanges 0) finalRemeaning finalR finalC finalS
     where
+        (totalChanges, finalRemeaning, finalR, finalC, finalS) = helper rest rows cols sqrs
+
         helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)], Arr, Arr, Arr)
-        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs = if popCount possible == 1 then ((rowCounter, colCounter, possible):changed', newRem', lastR', lastC', lastS') else (changed, tup:newRem, lastR, lastC, lastS) 
+        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs =
+            if pC == 1
+                then ((rowCounter, colCounter, possible):changed', newRem', lastR', lastC', lastS')
+                else (changed, tup:newRem, lastR, lastC, lastS)
             where
                 possible :: Value
                 possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
-                
+                pC = popCount possible
+
                 (changed, newRem, lastR, lastC, lastS) =  helper rest rows cols sqrs
                 (changed', newRem', lastR', lastC', lastS') =  helper rest newR newC newS
-                
-                (newR, newC, newS) = updateRCS (xor constALL possible) rowCounter colCounter rows cols sqrs
-        
+
+                (newR, newC, newS) = updateRCS (complement possible) rowCounter colCounter rows cols sqrs
         helper _ rows cols sqrs = ([], [], rows, cols, sqrs)
-    
-        (totalChanges, finalRemeaning, finalR, finalC, finalS) = helper rest rows cols sqrs
 
 --Returns False if an empty tile has no possible values
 canBeFinished :: Sudoku -> Bool
@@ -88,19 +85,18 @@ canBeFinished (Sudoku _ rest rows cols sqrs) = helper rest
         helper ((rowCounter, colCounter):rems) = if and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter)) == 0 then False else helper rems
         helper _ = True
 
-
 --Generates a list with all the possible values in a tile
-trySudokus :: Sudoku -> Int -> Int -> Value -> Value -> [Sudoku]
-trySudokus sud rowCounter colCounter val prev = helper val prev
+trySudokus :: Sudoku -> Int -> Int -> Value -> [Sudoku]
+trySudokus sud rowCounter colCounter val = helper val
     where
-        helper :: Value -> Value -> [Sudoku]
-        helper val' prev' = 
-            if prev' > val'
+        helper :: Value -> [Sudoku]
+        helper val' =
+            if val' == 0
                 then []
-                else result : trySudokus sud rowCounter colCounter val (shift getVal 1)
+                else result : trySudokus sud rowCounter colCounter (xor val getVal)
             where
                 result = genSudokuOneChange sud getVal rowCounter colCounter
-                getVal = getNextVal val' prev'
+                getVal = isolSmallBit val'
 
 --Performs a DFS on the possible sudokus, until a valid one is found
 fall :: [Sudoku] -> (Sudoku, Bool)
@@ -109,23 +105,28 @@ fall (sudo:sudos) = if pos then (res, True) else fall sudos
         (res, pos) = solveRecursively sudo
 fall _ = (sudokuEMPTY, False)
 
---In charge of calling setAllForced / fall in order, starting point of the program
+--In charge of calling setForced / fall in order, starting point of the program
 solveRecursively :: Sudoku -> (Sudoku, Bool)
-solveRecursively sud = if not (canBeFinished setAll) then (sudokuEMPTY, False) else if isFinished setAll then (setAll, True) else fall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible 1)
+solveRecursively sud =
+    if not (canBeFinished setAll)
+        then (sudokuEMPTY, False)
+        else
+            if isFinished setAll
+                then (setAll, True)
+                else fall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
     where
         setAll :: Sudoku
-        setAll@(Sudoku vs rest rows cols sqrs) = setAllForced sud
-        
+        setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
+
         ((rowCounter, colCounter):newRem) = rest
         possible :: Value
         possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
 
-
 solveParallel :: Sudoku -> (Sudoku, Bool)
-solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible 1)
+solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
     where 
         setAll :: Sudoku
-        setAll@(Sudoku vs rest rows cols sqrs) = setAllForced sud
+        setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
 
         ((rowCounter, colCounter):newRem) = rest
         possible :: Value
@@ -136,13 +137,12 @@ solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySu
             where
                 next = parFall sudos
                 pair = solveRecursively sudo
-                
+
         parFall _ = (sudokuEMPTY, False)
 
 
 main :: IO()
 main = do
-
     let r = fst $ solveParallel $ genSudoku vals_final
 
     startBool <- getCurrentTime

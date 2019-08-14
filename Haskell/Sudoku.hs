@@ -1,7 +1,6 @@
 module Sudoku where
 
 import Data.Char (chr)
-import Data.List (foldl')
 
 import Data.Array.Unboxed
 import Data.Bits
@@ -9,8 +8,7 @@ import Data.Bits
 type Value = Int
 type Arr = (UArray Int Value)
 
---TODO?: Change the board / values / vs from a 2d list to a 2d UArray
-data Sudoku = Sudoku [[Value]] [(Int, Int)] Arr Arr Arr deriving (Eq)
+data Sudoku = Sudoku [[Value]] [(Int, Int)] Arr Arr Arr
 
 --Possible improvements:
 --  Use Data.Vectors.Unboxed for the board / remeaning. Probably even worse performance
@@ -42,8 +40,8 @@ toPow2 :: Value -> Value
 {-# INLINE toPow2 #-}
 toPow2 x = shift 1 (x - 1)
 
-fromPow2 :: Value -> Value -> Value
-fromPow2 x acc = if x <= 0 then acc else fromPow2 (shift x (-1)) (acc + 1)
+fromPow2 :: Value -> Value
+fromPow2 x = if x == 0 then 0 else 1 + countTrailingZeros x
 
 
 --Fast, it only checks if there are no values remeaning. If everything works well, there should be no problem
@@ -59,11 +57,11 @@ isFinishedSlow (Sudoku vs _ _ _ _) = not (or (map (any (==0)) vs))
 prettify :: [Value] -> String
 prettify (x:xs) = val : ' ' : prettify xs
     where
-        val = if x == 0 then '-' else chr $ (fromPow2 x 0) + 48
+        val = if x == 0 then '-' else chr $ (fromPow2 x) + 48
 prettify _ = ['\n']
 
 toStr :: Sudoku -> String
-toStr (Sudoku val _ _ _ _) = foldl' (join) "" val
+toStr (Sudoku val _ _ _ _) = foldl (join) "" val
     where
         join :: String -> [Value] -> String
         join str v = str ++ prettify v
@@ -71,11 +69,11 @@ toStr (Sudoku val _ _ _ _) = foldl' (join) "" val
 
 orArray :: [Value] -> Value
 {-# INLINE orArray #-}
-orArray = foldl' (.|.) 0
+orArray = foldl (.|.) 0
 
 andArray :: [Value] -> Value
 {-# INLINE andArray #-}
-andArray = foldl' (.&.) constALL
+andArray = foldl (.&.) constALL
 
 --bitwise and & 3 values
 and3 :: Value -> Value -> Value -> Value
@@ -122,7 +120,7 @@ getZeroes (v:vs) rowCount = getZeroesRow v 0 ++ getZeroes vs (rowCount+1)
         getZeroesRow _ _ = []
 getZeroes _ _ = []
 
---Translates the representation from a sudoku into a Sudoku.
+--Translates the representation from a sudoku into a Sudoku data struct.
 --With all the values and possible calculated
 genSudoku :: [[Value]] -> Sudoku
 genSudoku vals = Sudoku arrayPow2 rest newRows newCols newSqrs
@@ -135,7 +133,7 @@ genSudoku vals = Sudoku arrayPow2 rest newRows newCols newSqrs
 
 --Generates a sudoku from the previous, there is no need to get the pow2
 --of each element
---PRE: rest has to be updated before, notice that is doesn't change
+--PRE: rest has to be updated before, notice that it doesn't change
 genSudokuFromPrev :: [[Value]] -> [(Int, Int)] -> Sudoku
 genSudokuFromPrev vals rest = Sudoku vals rest newRows newCols newSqrs
     where
@@ -143,40 +141,42 @@ genSudokuFromPrev vals rest = Sudoku vals rest newRows newCols newSqrs
         newCols = listArray (0,constS-1) (genCols vals)
         newSqrs = listArray (0,constS-1) (genSqrs vals)
 
---Updates rows / coahls / sqrs after one value has been changed
+--Updates rows / cols / sqrs after one value has been changed
 --PRE: valMask is the mask of the new value xor constALL newVal
 updateRCS :: Value -> Int -> Int -> Arr -> Arr -> Arr -> (Arr, Arr, Arr)
 {-# INLINE updateRCS #-}
 updateRCS valMask rowCount colCount oldR oldC oldS = (newR, newC, newS)
     where
-        
-        newR = listArray (0,constS-1) (bfR ++ (.&.) prevR valMask:afR)
-        (bfR, prevR:afR) = splitAt rowCount (elems oldR)
+        prevR = oldR ! rowCount
+        prevC = oldC ! colCount
+        prevS = oldS ! sqrIndex
+        updatedR = (.&.) prevR valMask
+        updatedC = (.&.) prevC valMask
+        updatedS = (.&.) prevS valMask
 
-        newC = listArray (0,constS-1) (bfC ++ (.&.) prevC valMask:afC)
-        (bfC, prevC:afC) = splitAt colCount (elems oldC)
+        newR = listArray (0,constS-1) (bfR ++ updatedR:afR)
+        (bfR, _:afR) = splitAt rowCount (elems oldR)
 
-        newS = listArray (0,constS-1) (bfS ++ (.&.) prevS valMask:afS)
-        (bfS, prevS:afS) = splitAt (getSqrIndex rowCount colCount) (elems oldS)
+        newC = listArray (0,constS-1) (bfC ++ updatedC:afC)
+        (bfC, _:afC) = splitAt colCount (elems oldC)
+
+        newS = listArray (0,constS-1) (bfS ++ updatedS:afS)
+        (bfS, _:afS) = splitAt sqrIndex (elems oldS)
+
+        sqrIndex = getSqrIndex rowCount colCount
 
 --Regenerates the sudoku after only one tile has been changed
 genSudokuOneChange :: Sudoku -> Value -> Int -> Int -> Sudoku
 {-# INLINE genSudokuOneChange #-}
 genSudokuOneChange (Sudoku oldVs newRem oldR oldC oldS) newVal rowCount colCount = Sudoku newVs newRem newR newC newS
     where
-        valMask :: Value
-        valMask = xor constALL newVal
         newVs = subIn oldVs rowCount colCount newVal
-        
-        (newR, newC, newS) = updateRCS valMask rowCount colCount oldR oldC oldS
+        (newR, newC, newS) = updateRCS (complement newVal) rowCount colCount oldR oldC oldS
 
 --Extracts the smallest power of 2 of a value (9 -> 1, 10 -> 2, 192 -> 64)
-getNextVal :: Value -> Value -> Value
-{-# INLINE getNextVal #-}
-getNextVal val c = loop c
-    where
-        loop :: Value -> Value
-        loop v = if ((.&.) val v) == v then v else loop (shift v 1) 
+isolSmallBit :: Value -> Value
+{-# INLINE isolSmallBit#-}
+isolSmallBit val = (.&.) val (-val)
 
 --Changes a value in the position (r, c) in a 2d list
 subIn :: [[Value]] -> Int -> Int -> Value -> [[Value]]
@@ -236,7 +236,7 @@ isValid (Sudoku vs _ _ _ _) = sumRows vs && sumCols vs && (sum (sumSquares vs)) 
         sumSquares :: [[Value]] -> [Value]
         sumSquares (l1:l2:l3:ls) = sumRecurs l1 l2 l3 : sumSquares ls
         sumSquares _ = []
-        
+
         sumRecurs :: [Value] -> [Value] -> [Value] -> Value
         sumRecurs (x1:x2:x3:xss) (y1:y2:y3:yss) (z1:z2:z3:zss) = x1 + x2 + x3 + y1 + y2 + y3 + z1 + z2 + z3 + sumRecurs xss yss zss
         sumRecurs _ _ _ = 0

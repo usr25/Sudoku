@@ -53,8 +53,8 @@ This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
   * **Python2** -> 8.9s, 10100%
   * **Python3** -> 11.0s, 12395%
   * **Cython** -> 1.2s, 1348%
-  * **Haskell** -> 7.2s, 8089%
-  * **Haskell P** -> 6.2s, 6966%
+  * **Haskell** -> 5.1s, 5730%
+  * **Haskell P** -> 4.2s, 4719%
 
 ### Algorithm
   The possible values for each square are the intersection of the possible values in its row / col / sqr
