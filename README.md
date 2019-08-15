@@ -44,7 +44,7 @@ If there is no `-test` flag or sudokus the program will terminate. Illegal sudok
 
 ### Results
 This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded. The proportions should stay the same regardless of the device
-(P stands for parallel)
+(P stands for parallel, lower is better)
 
   * **GO**     -> 120ms, 141%
   * **Rust**   -> 79ms, 92%
@@ -52,9 +52,9 @@ This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
   * **C**      -> 85ms, 100%
   * **Python2** -> 8.9s, 10470%
   * **Python3** -> 11.0s, 12940%
-  * **Cython** -> 1.2s, 1411%
-  * **Haskell** -> 5.1s, 6000%
-  * **Haskell P** -> 4.2s, 4941%
+  * **Cython** -> 1.2s, 1410%
+  * **Haskell** -> 5.0s, 5880%
+  * **Haskell P** -> 4.2s, 4940%
 
 ### Algorithm
   The possible values for each square are the intersection of the possible values in its row / col / sqr

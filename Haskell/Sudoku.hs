@@ -90,6 +90,29 @@ genRows :: [[Value]] -> [Value]
 genRows (x:xs) = xor constALL (orArray x) : genRows xs
 genRows _ = []
 
+--Adds up all the values in a row and ensures they equal constALL
+sumRows :: [[Value]] -> Bool
+{-# INLINE sumRows #-}
+sumRows vs = all (==constALL) (map sum vs)
+
+sumCols :: [[Value]] -> Bool
+{-# INLINE sumCols #-}
+sumCols = sumRows . transpose
+
+--TODO: Check if any values are repeated
+--Checks if a sudoku is valid, the addition of all the values in any row / col / sqr == constALL
+isValid :: Sudoku -> Bool
+{-# INLINE isValid #-} 
+isValid (Sudoku vs _ _ _ _) = sumRows vs && sumCols vs && (sum (sumSquares vs)) == constS * constALL 
+    where
+        sumSquares :: [[Value]] -> [Value]
+        sumSquares (l1:l2:l3:ls) = sumRecurs l1 l2 l3 : sumSquares ls
+        sumSquares _ = []
+
+        sumRecurs :: [Value] -> [Value] -> [Value] -> Value
+        sumRecurs (x1:x2:x3:xss) (y1:y2:y3:yss) (z1:z2:z3:zss) = x1 + x2 + x3 + y1 + y2 + y3 + z1 + z2 + z3 + sumRecurs xss yss zss
+        sumRecurs _ _ _ = 0
+
 --Generate the possible values in each col
 genCols :: [[Value]] -> [Value]
 {-# INLINE genCols #-}
@@ -130,16 +153,6 @@ genSudoku vals = Sudoku arrayPow2 rest newRows newCols newSqrs
         newRows = listArray (0,constS-1) (genRows arrayPow2)
         newCols = listArray (0,constS-1) (genCols arrayPow2)
         newSqrs = listArray (0,constS-1) (genSqrs arrayPow2)
-
---Generates a sudoku from the previous, there is no need to get the pow2
---of each element
---PRE: rest has to be updated before, notice that it doesn't change
-genSudokuFromPrev :: [[Value]] -> [(Int, Int)] -> Sudoku
-genSudokuFromPrev vals rest = Sudoku vals rest newRows newCols newSqrs
-    where
-        newRows = listArray (0,constS-1) (genRows vals)
-        newCols = listArray (0,constS-1) (genCols vals)
-        newSqrs = listArray (0,constS-1) (genSqrs vals)
 
 --Updates rows / cols / sqrs after one value has been changed
 --PRE: valMask is the mask of the new value xor constALL newVal
@@ -215,28 +228,75 @@ updateVs (v:vs) rest rowCount = if fstRow > rowCount --Checks if it is necessary
             | colCount == colC = val : changeInRow vss restRem (colCount+1)
             | True = v' : changeInRow vss rest (colCount+1)
         changeInRow _ _ _= []
-
 updateVs _ _ _ = []
 
---Adds up all the values in a row and ensures they equal constALL
-sumRows :: [[Value]] -> Bool
-{-# INLINE sumRows #-}
-sumRows vs = all (==constALL) (map sum vs)
-
-sumCols :: [[Value]] -> Bool
-{-# INLINE sumCols #-}
-sumCols = sumRows . transpose
-
---TODO: Check if any values are repeated
---Checks if a sudoku is valid, the addition of all the values in any row / col / sqr == constALL
-isValid :: Sudoku -> Bool
-{-# INLINE isValid #-} 
-isValid (Sudoku vs _ _ _ _) = sumRows vs && sumCols vs && (sum (sumSquares vs)) == constS * constALL 
+--Returns False if an empty tile has no possible values
+canBeFinished :: Sudoku -> Bool
+canBeFinished (Sudoku _ rest rows cols sqrs) = helper rest
     where
-        sumSquares :: [[Value]] -> [Value]
-        sumSquares (l1:l2:l3:ls) = sumRecurs l1 l2 l3 : sumSquares ls
-        sumSquares _ = []
+        helper :: [(Int, Int)] -> Bool
+        helper ((rowCounter, colCounter):rems) =
+            if and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter)) == 0
+                then False
+                else helper rems
+        helper _ = True
 
-        sumRecurs :: [Value] -> [Value] -> [Value] -> Value
-        sumRecurs (x1:x2:x3:xss) (y1:y2:y3:yss) (z1:z2:z3:zss) = x1 + x2 + x3 + y1 + y2 + y3 + z1 + z2 + z3 + sumRecurs xss yss zss
-        sumRecurs _ _ _ = 0
+--Sets all the forced values for a sudoku. 
+--eg.: The only possible value in a tile is 1, it sets the value as 1 
+setForced :: Sudoku -> Sudoku
+setForced (Sudoku vs rest rows cols sqrs) = Sudoku (updateVs vs totalChanges 0) finalRemeaning finalR finalC finalS
+    where
+        (totalChanges, finalRemeaning, finalR, finalC, finalS) = helper rest rows cols sqrs
+
+        helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)], Arr, Arr, Arr)
+        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs =
+            if pC == 1
+                then ((rowCounter, colCounter, possible):changed', newRem', lastR', lastC', lastS')
+                else (changed, tup:newRem, lastR, lastC, lastS)
+            where
+                possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+                pC = popCount possible
+
+                (changed, newRem, lastR, lastC, lastS) =  helper rest rows cols sqrs
+                (changed', newRem', lastR', lastC', lastS') =  helper rest newR newC newS
+
+                (newR, newC, newS) = updateRCS (complement possible) rowCounter colCounter rows cols sqrs
+        helper _ rows cols sqrs = ([], [], rows, cols, sqrs)
+
+--Generates a list with all the Sudokus generated from the possible values in a tile
+trySudokus :: Sudoku -> Int -> Int -> Value -> [Sudoku]
+trySudokus sud rowCounter colCounter val = helper val
+    where
+        helper :: Value -> [Sudoku]
+        helper val' =
+            if val' == 0
+                then []
+                else result : trySudokus sud rowCounter colCounter (xor val getVal)
+            where
+                result = genSudokuOneChange sud getVal rowCounter colCounter
+                getVal = isolSmallBit val'
+
+--Performs a DFS on the possible sudokus, until a valid one is found
+fall :: [Sudoku] -> (Sudoku, Bool)
+fall (sudo:sudos) = if pos then (res, True) else fall sudos
+    where
+        (res, pos) = solveRecursively sudo
+fall _ = (sudokuEMPTY, False)
+
+--In charge of calling setForced / fall in order, starting point of the program
+solveRecursively :: Sudoku -> (Sudoku, Bool)
+solveRecursively sud =
+    if not (canBeFinished setAll)
+        then (sudokuEMPTY, False)
+        else
+            if isFinished setAll
+                then (setAll, True)
+                else fall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
+    where
+        setAll :: Sudoku
+        setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
+
+        ((rowCounter, colCounter):newRem) = rest
+        possible :: Value
+        possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+
