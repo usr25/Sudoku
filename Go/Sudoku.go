@@ -46,7 +46,7 @@ var isTH bool
 
 /*---------------------INITIALIZATION------------------------*/
 /* Test sudoku:
-"024000000
+ 024000000
  000007100
  090000000
 
@@ -56,7 +56,7 @@ var isTH bool
 
  000400029
  000200300
- 100000000"
+ 100000000
 */
 //Another good one: 000000000000003085001020000000507000004000100090000000500000073002010000000040009
 
@@ -156,16 +156,15 @@ func (self Sudoku) PrintSudoku(pretty bool) string {
 	return builder.String() + "--------------------" + strconv.Itoa(self.filledTiles()) + "/" + strconv.Itoa(SS)
 }
 
-func (self Sudoku) filledTiles() int {
+func (self Sudoku) filledTiles() (t int) {
 	/* Returns the number of filled tiles */
-	t := 0
 	for i := 0; i < SS; i++ {
 		if self.board[i] != 0 {
 			t++
 		}
 	}
 
-	return t
+	return
 }
 
 func (self Sudoku) finished() bool {
@@ -274,7 +273,7 @@ func setAllForced(s *Sudoku) bool {
 	/* Calls set_forced until there are no more forced tiles.
 	 * Returns false if the board is unsolvable
 	 */
-	var i, j int
+	var i, j, m int
 	var val int
 	var available, mask Value
 
@@ -288,7 +287,8 @@ func setAllForced(s *Sudoku) bool {
 				continue
 			}
 			i, j = coord(val)
-			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[getSqrIndex(i, j)]
+			m = getSqrIndex(i, j)
+			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[m]
 
 			if available == 0 {
 				return false
@@ -300,7 +300,7 @@ func setAllForced(s *Sudoku) bool {
 
 				s.rowsAv[i] &= mask
 				s.colsAv[j] &= mask
-				s.sqrsAv[getSqrIndex(i, j)] &= mask
+				s.sqrsAv[m] &= mask
 
 				lastUpdate = true
 

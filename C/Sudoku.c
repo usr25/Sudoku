@@ -27,7 +27,7 @@ static inline int GET_CRD(int i, int j) { return (i << 4) + j; }
 
 typedef struct {
     unsigned int values[S][S];
-    
+
     unsigned int rowsPos[S];
     unsigned int colsPos[S];
     unsigned int sqrsPos[S];
@@ -67,7 +67,7 @@ Board generateSudoku(){
         {0,0,0, 0,0,0, 0,8,4},
         {0,0,0, 0,7,5, 0,0,0},
         {6,0,0, 0,3,0, 0,0,0},
-        
+
         {0,0,0, 4,0,0, 0,2,9},
         {0,0,0, 2,0,0, 3,0,0},
         {1,0,0, 0,0,0, 0,0,0}
@@ -106,7 +106,7 @@ void printBoard(Board board) {
         }
         printf("\n");
     }
-    
+
     printf("---------------------------\n");
 }
 
@@ -114,7 +114,7 @@ void printBoard(Board board) {
 
 bool checkBoard(Board board) {
     int pos, row, col, sqr;
-    
+
     // Checks to see if all rows match
     for (int i = 0; i < S; i++) {
         row = 0;
@@ -126,7 +126,7 @@ bool checkBoard(Board board) {
             }
         }
     }
-    
+
     // Checks to see if all columns match
     for (int i = 0; i < S; i++) {
         col = 0;
@@ -138,7 +138,7 @@ bool checkBoard(Board board) {
             }
         }
     }
-    
+
     // Checks to see if all squares match
     for (int i = 0; i < S; i += R) {
         for (int j = 0; j < S / R; j += R) {
@@ -154,7 +154,7 @@ bool checkBoard(Board board) {
             }
         }
     }
-    
+
     return true;
 }
 
@@ -164,7 +164,7 @@ bool completeBoard(Board board) {
             if (board.values[i][j] < 1 || board.values[i][j] >= ALL) return false;
         }
     }
-    
+
     return true;
 }
 
@@ -177,37 +177,36 @@ bool finishedBoard(Board board) {
 bool dfs(Board *board, int index) {
     Board new_board;
     int state, new_index;
-    
+
     // If all values are set, the recursion is finished
-    if (index >= blanks_size) return true;
-    
+    if (index < 0) return true;
+
     int x = GET_X(blanks[index]);
     int y = GET_Y(blanks[index]);
-    
+
     // Goes to the next tile if the current one is already set
     if (board->values[y][x])
-        return dfs(board, index+1);
-    
+        return dfs(board, index - 1);
+
     unsigned int possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[GET_SQR(y, x)];
 
     while (possible)
     {
-        unsigned int v = possible & (-possible);
+        unsigned int v = possible & -possible;
         possible &= possible - 1;
         // Generates a new copy of the board to improve performance
         new_board = *board;
         new_board.values[y][x] = v;
-        new_index = index + 1;
-        
+        new_index = index - 1;
+
         // Removes the picked value from the possible ones
         updateTileAdded(&new_board, y, x);
-        
+
         // Sets all the possible forced tiles
         do {
             state = setAllForced(&new_board, new_index);
         } while (state == 1);
-        
-        
+
         if (state != 2 && dfs(&new_board, new_index)) {
             *board = new_board;
             return true;
@@ -223,7 +222,7 @@ bool dfs(Board *board, int index) {
 void calculatePossible(Board *board) {
     unsigned short pos;
     int m;
-    
+
     // Goes tile by tile and saves all the found values
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
@@ -237,7 +236,7 @@ void calculatePossible(Board *board) {
             }
         }
     }
-    
+
     for (int k = 0; k < S; k++) {
         board->rowsPos[k] ^= ALL;
         board->colsPos[k] ^= ALL;
@@ -249,12 +248,12 @@ void calculatePossible(Board *board) {
 /* Updates the possible values for the row, column, and square of the 
  * tile that was changed.
  */
-void updateTileAdded(Board *board, const char y, const char x) {
-    int val = ~board->values[y][x];
-    
-    board->rowsPos[y] &= val;
-    board->colsPos[x] &= val;
-    board->sqrsPos[GET_SQR(y,x)] &= val;
+inline void updateTileAdded(Board *board, const char y, const char x) {
+    int mask = ~board->values[y][x];
+
+    board->rowsPos[y] &= mask;
+    board->colsPos[x] &= mask;
+    board->sqrsPos[GET_SQR(y,x)] &= mask;
 }
 
 /* Sets all the tiles that only have one possible value.
@@ -264,17 +263,17 @@ void updateTileAdded(Board *board, const char y, const char x) {
  *  2 if there is an empty tile with no possible value
  *  any other value if no modifications were made
  */
-char setAllForced(Board *board, int min) {
+char setAllForced(Board *board, int max) {
     int x, y;
     int possible;
     char state = 0;
 
-    for (int i = min; state != 2 && i < blanks_size; i++) {
+    for (int i = max; state != 2 && i >= 0; i--) {
         x = GET_X(blanks[i]);
         y = GET_Y(blanks[i]);
-        
-        if (! board->values[y][x]) {
-        	possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[GET_SQR(y, x)];
+
+        if (!board->values[y][x]) {
+            possible = board->rowsPos[y] & board->colsPos[x] & board->sqrsPos[GET_SQR(y, x)];
             state = 2 - __builtin_popcount(possible);
 
             if (state == 1) {
@@ -283,14 +282,14 @@ char setAllForced(Board *board, int min) {
             }
         }
     }
-    
+
     return state;
 }
 
 void solve(Board *board) {
     calculatePossible(board);
-    
-    dfs(board, 0);
+    setAllForced(board, 0);
+    dfs(board, 80);
 }
 
 
@@ -298,13 +297,10 @@ int main(int argc, char const *argv[])
 {
     Board b = generateSudoku();
     printBoard(b);
- 
+
     time_t start = clock();
-    
     solve(&b);
-
     time_t end = clock();
-
 
     printBoard(b);
     printf("Is valid: "); printf((finishedBoard(b)) ? "true\n" : "false\n");

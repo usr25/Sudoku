@@ -315,48 +315,25 @@ impl Sudoku {
         } else if s.remeaning.len() == 0 {
             return s;
         } else {
-            let mut index = s.remeaning[0];
 
-            //Find the smallest value
-            for temp_index in s.remeaning.iter() {
-                let pc = pop_count(s.possible(*temp_index));
-                if pc == 2 {
-                    index = *temp_index;
-                    break;
-                } else if pc == 3 {
-                    index = *temp_index;
-                }
+            let index = s.remeaning.pop().expect("NO ELEMS");
+            let mut possible = s.possible(index);
+            let mut children = Vec::with_capacity(pop_count(possible) as usize);
+
+            while possible != 0 {
+                let val = possible & (!possible + 1);
+                possible &= possible - 1;
+                let mut new_sud = s.clone();
+
+                new_sud.board[index] = val;
+                new_sud.update(index);
+
+                children.push(thread::spawn(move || Sudoku::solve(new_sud)));
             }
-
-            let (tx, rx) = mpsc::channel();
-            let mut new_rem: Vec<usize> = Vec::with_capacity(s.remeaning.len() - 1);
-
-            for temp_index in s.remeaning.iter() {
-                if *temp_index != index {
-                    new_rem.push(*temp_index);
-                }
-            }
-
-            s.remeaning = new_rem;
-
-            //spawn the threads
-            thread::spawn(move || {
-                let mut possible = s.possible(index);
-
-                while possible != 0 {
-                    let val = possible & (!possible + 1);
-                    possible &= possible - 1;
-                    let mut new_sud = s.clone();
-
-                    new_sud.board[index] = val;
-                    new_sud.update(index);
-
-                    tx.send(Sudoku::solve(new_sud)).unwrap();
-                }
-            });
 
             //Collect the results
-            for (b, sud) in rx {
+            for child in children {
+                let (b, sud) = child.join().unwrap();
                 if b {
                     return sud;
                 }
@@ -394,7 +371,7 @@ fn main() {
     let mut info = false;
     let mut pretty = false;
 
-    if args.len() == 1 {
+    if args.len() <= 1 {
         println!("Type -h for help");
     }
 

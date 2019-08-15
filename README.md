@@ -46,15 +46,15 @@ If there is no `-test` flag or sudokus the program will terminate. Illegal sudok
 This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue proper sudoku which is hard coded. The proportions should stay the same regardless of the device
 (P stands for parallel)
 
-  * **GO**     -> 120ms, 134%
-  * **Rust**   -> 80ms, 89%
-  * **Rust P** -> 85ms, 95%
-  * **C**      -> 89ms, 100%
-  * **Python2** -> 8.9s, 10100%
-  * **Python3** -> 11.0s, 12395%
-  * **Cython** -> 1.2s, 1348%
-  * **Haskell** -> 5.1s, 5730%
-  * **Haskell P** -> 4.2s, 4719%
+  * **GO**     -> 120ms, 141%
+  * **Rust**   -> 79ms, 92%
+  * **Rust P** -> 69ms, 81%
+  * **C**      -> 85ms, 100%
+  * **Python2** -> 8.9s, 10470%
+  * **Python3** -> 11.0s, 12940%
+  * **Cython** -> 1.2s, 1411%
+  * **Haskell** -> 5.1s, 6000%
+  * **Haskell P** -> 4.2s, 4941%
 
 ### Algorithm
   The possible values for each square are the intersection of the possible values in its row / col / sqr
@@ -70,13 +70,15 @@ This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
   This algorithm is equivalent to traversing a tree in a DFS fashion, the input sudoku is the root and the leafs are solved sudokus or impossible sudokus, each branch is a choice, when there is only 1 branch it is forced, when there are more it is needed to traverse first one and then the other.
 
 ### Notes
+  * Due to Rust being so fast, the parallel version is very unstable, so the results have a higher standart derivation, reaching lows as 59ms but highs as 90ms
+
   * In order to have a unique solution (proper sudoku), a sudoku has to have at least 17 clues (Having 17 clues does not imply it is a proper sudoku).
 
   * Solving sudokus benefits greatly from destructive writing into arrays, which is the opposite of what Haskell is used for (it can be done using the ST monad, generating messy and suboptimal code). The Haskell implementation involves a lot of unnecessary copying / writing.
 
   * Python2(.7) is significantly faster than Python3(.5/.7). This is due to Py3 using long integers, and the abundant use of integers in the sudoku
 
-  * Concurrency isn't always an improvement: in Go / Haskell it yields better results, in Python the same, and worse in Rust.
+  * Concurrency isn't always an improvement: in Go / Haskell / Rust it yields better results, in Python the same.
 
   * Some languages, such as C, benefit from using 64bit-integers while others, such as Rust, don't and even yield worse performance. This may be due to the native size of the CPU and being able to fit more in the cache making up for eachother
 
