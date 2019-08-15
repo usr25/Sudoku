@@ -1,6 +1,5 @@
 package main
 
-//TODO: bits.OnesCount()
 import (
 	"flag"
 	"fmt"
@@ -43,6 +42,7 @@ var calls int
 
 var remeaning [SS]int
 var counter int
+var isTH bool
 
 /*---------------------INITIALIZATION------------------------*/
 /* Test sudoku:
@@ -58,6 +58,7 @@ var counter int
  000200300
  100000000"
 */
+//Another good one: 000000000000003085001020000000507000004000100090000000500000073002010000000040009
 
 func Parse(s string) (sud Sudoku) {
 	//It is assumed that the str is of length 81
@@ -75,8 +76,9 @@ func Parse(s string) (sud Sudoku) {
 			}
 		}
 	}
-
 	counter = temp_counter
+
+	isTH = sud.isTopHeavy()
 
 	return
 }
@@ -102,21 +104,20 @@ func popCount(v Value) Value {
 	//The numbers are in octal
 	y := (v >> 1) & 033333333333
 	z := v - y - ((y >> 1) & 033333333333)
-
 	return ((z + (z >> 3)) & 030707070707) % 63
 }
 
 func index(i, j int) int {
-	return S*i + j
+	return S * i + j
 }
 func coord(i int) (int, int) {
 	return i / S, i % S
 }
 func getSqrIndex(i, j int) int {
-	return R*(i/R) + (j / R)
+	return R * (i / R) + (j / R)
 }
 func isPow2(v Value) bool {
-	return v&(v-1) == 0
+	return v & (v - 1) == 0
 }
 
 /*---------------------CHECKING------------------------*/
@@ -140,14 +141,14 @@ func (self Sudoku) PrintSudoku(pretty bool) string {
 				builder.WriteString(strconv.Itoa(log2(self.board[index(i, j)])) + " ")
 			}
 
-			if j%R == R-1 {
+			if j % R == R - 1 {
 				builder.WriteString(" ")
 			}
 		}
 
 		builder.WriteString("\n")
 
-		if i%R == R-1 && i != S-1 {
+		if i % R == R - 1 && i != S - 1 {
 			builder.WriteString("\n")
 		}
 	}
@@ -163,6 +164,7 @@ func (self Sudoku) filledTiles() int {
 			t++
 		}
 	}
+
 	return t
 }
 
@@ -231,20 +233,6 @@ func (self Sudoku) verifySudoku() bool {
 }
 
 /*--------------------------SOLVER-----------------------------*/
-
-func (self Sudoku) canBeFinished() bool {
-	/* Returns if a sudoku can be finished. true DOES NOT imply it can be finished.
-	 * a sudoku cant be finished if one of the remaning tiles to fill has got no
-	 * possibilities
-	 */
-	for i := 0; i < counter; i++ {
-		if self.board[remeaning[i]] == 0 && self.possible(remeaning[i]) == 0 {
-			return false
-		}
-	}
-
-	return true
-}
 
 func (self Sudoku) possible(index int) Value {
 	/* Returns the possible values for a given index */
@@ -316,8 +304,7 @@ func setAllForced(s *Sudoku) bool {
 
 				lastUpdate = true
 
-				forcedChanges++ //DEBUG
-
+				forcedChanges++
 			}
 		}
 	}
@@ -343,10 +330,15 @@ func (self Sudoku) solve() (bool, Sudoku) {
 		return true, self
 	}
 
-	//Faster in some cases
 	var index int
-	for i := counter - 1; self.board[index] != 0 && i >= 0; i-- {
-		index = remeaning[i]
+	if isTH {
+		for i := 0; self.board[index] != 0 && i < counter; i++ {
+			index = remeaning[i]
+		}
+	} else {
+		for i := counter - 1; self.board[index] != 0 && i >= 0; i-- {
+			index = remeaning[i]
+		}
 	}
 
 	var allPos Value = self.possible(index)
@@ -379,13 +371,18 @@ func (self Sudoku) solveMain() (Sudoku /*ok*/, bool /*forcedChanges*/, int /*cal
 
 	//Find the first empty tile in the board
 	var index, i int
-	for ; self.board[index] != 0 && i < counter; i++ {
-		index = remeaning[i]
+	if isTH {
+		for ; self.board[index] != 0 && i < counter; i++ {
+			index = remeaning[i]
+		}
+	} else {
+		for ; self.board[index] != 0 && i >= 0; i-- {
+			index = remeaning[i]
+		}
 	}
 
 	allPos := self.possible(index)
 	pc := popCount(allPos)
-
 	fst := true
 
 	//Find the most optimal tile (only 2 possible) or a suboptimal (3 possible)
@@ -431,6 +428,23 @@ func (self Sudoku) solveMain() (Sudoku /*ok*/, bool /*forcedChanges*/, int /*cal
 func helper(s Sudoku) Sudoku {
 	_, s = s.solve()
 	return s
+}
+
+func (self Sudoku) isTopHeavy() bool{
+	half := SS / 2
+	bottom := 0
+	top := 0
+	for i := 0; i < SS; i++ {
+		if self.board[i] != 0{
+			if i >= half {
+				bottom++
+			} else {
+				top++
+			}
+		}
+	}
+
+	return top >= bottom
 }
 
 func main() {
