@@ -389,6 +389,19 @@ impl Sudoku {
     }
 }
 
+fn read_from_file(path: &str) -> std::io::Result<()> {
+    use std::io::BufRead;
+
+    //The sudokus have to be separated with a newline '\n'
+    let file = std::fs::File::open(path)?;
+    let reader = std::io::BufReader::new(file);
+    for line in reader.lines() {
+        Sudoku::solve_from_str(&line?, false);
+    }
+
+    Ok(())
+}
+
 unsafe fn populate_possible() {
     for i in 0..SS {
         let (row, col) = coord(i);
@@ -418,7 +431,9 @@ Usage: ./Sudoku [ARGS] [SUDOKUS]...
   -pretty       Draw the sudoku in a human readable way
   -bench        Solve the benchmark sudoku, call with -info
 
-Each sudoku has to be a string of 81 numbers, 0s for blank tiles 00021..31000";
+  --/path       The path to a file separated by sudokus
+
+Each sudoku has to be a string of 81 numbers, 0s or dots '.' to represent blank tiles 00021..31000";
 
 fn main() {
     use std::time::Instant;
@@ -443,7 +458,9 @@ fn main() {
                 pretty,
             ),
             a => {
-                if a.len() == SS {
+                if &a[..3] == "--/" {
+                    let _ = read_from_file(&a[2..]);
+                } else if a.len() == SS {
                     Sudoku::solve_from_str(a, pretty);
                 } else if !a.contains("Sudoku") {
                     println!(

@@ -85,4 +85,4 @@ P stands for parallel, lower is better
   * Some languages, such as C, benefit from using 64bit-integers while others, such as Rust, don't and even yield worse performance. This may be due to the native size of the CPU and being able to fit more in the cache making up for eachother
 
 ### Thanks
-  Thanks to [BartMassey](https://github.com/BartMassey) for the popcount algorithms and [tempate](https://github.com/tempate) for the idea
+  Thanks to [BartMassey](https://github.com/BartMassey) for the popcount algorithms and [tempate](https://github.com/tempate) for the idea. I got the test sudokus from [sunjay](https://github.com/sunjay/sudoku)
