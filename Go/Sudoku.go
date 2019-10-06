@@ -58,7 +58,6 @@ var isTH bool
  000200300
  100000000
 */
-//Another good one: 000000000000003085001020000000507000004000100090000000500000073002010000000040009
 
 func Parse(s string) (sud Sudoku) {
 	//It is assumed that the str is of length 81
@@ -67,7 +66,7 @@ func Parse(s string) (sud Sudoku) {
 	for i := 0; i < S; i++ {
 		for j := 0; j < S; j++ {
 			e = Value(s[i*S+j] - '0')
-			if e == 0 {
+			if e == 0 || s[i*S+j] == '.' {
 				sud.board[index(i, j)] = 0
 				remeaning[temp_counter] = index(i, j)
 				temp_counter++

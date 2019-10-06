@@ -1,10 +1,10 @@
-# Sudoku
+# Fast Sudoku Solver
 Sudoku solving algorithm implemented in different languages to observe the differences among them and, specially, the performance.
 
 O(_n_^_m_) algorithm, where _n_ is the number of empty tiles and _m_ the possible values (In this case, [1, 9] O(n^9)). Sudokus are an NP-Complete problem.
 
 ### Use
-_Requires go, rustc, gcc, python2/3, Cython and ghc. Other compilers may yield different results_
+_Requires go, rustc, gcc, python2/3, Cython and ghc. Other compilers may yield different results._
 
 There are compiled files in /Linux. `go run` has an overhead due to the compilation, use `go build` to generate the binary
 

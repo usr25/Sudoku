@@ -76,11 +76,15 @@ impl Sudoku {
         let mut remeaning: u128 = 0;
 
         for ch in s.chars() {
-            let val = ch.to_digit(10).unwrap();
-            if val == 0 {
+            if ch == '.' {
                 remeaning |= 1u128 << i;
             } else {
-                from_s[i] = 1 << (val - 1);
+                let val = ch.to_digit(10).unwrap();
+                if val == 0 {
+                    remeaning |= 1u128 << i;
+                } else {
+                    from_s[i] = 1 << (val - 1);
+                }
             }
             i += 1
         }
