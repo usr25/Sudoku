@@ -478,6 +478,6 @@ fn main() {
             println!("Total nodes:   {:?}", NODES);
         }
 
-        println!("Time: {}ms", now.elapsed().subsec_millis());
+        println!("Time: {}ms", now.elapsed().as_millis());
     }
 }
