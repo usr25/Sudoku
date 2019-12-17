@@ -12,9 +12,7 @@ cd into Sudoku/
 
 $ `go run Go/Sudoku.go -h #If there is trouble with GOBIN, refer to the` [go installation guide](https://golang.org/doc/install)
 
-$ `rustc -O dir/Rust/Sudoku.rs && ./SudokuParallel -h`
-
-$ `rustc -O dir/Rust/SudokuParallel.rs && ./SudokuParallel -h`
+$ `rustc -O dir/Rust/Sudoku.rs && ./Sudoku -h`
 
 $ `gcc -O3 -std=c11 -faggressive-loop-optimizations C/Sudoku.c`
 
@@ -29,6 +27,7 @@ $ `cd Haskell && ghc -O2 -optc-O3 -threaded SudokuParallel.hs && ./SudokuParalle
 Go and Rust implementations use command line arguments, use those to solve different sudokus
   * -bench: Solve the hard-coded sudoku, for benchmarking purposes
   * -info: Provide stats about the performance, such as time, nodes and changes
+  * -p: In Rust, use parallelism
   * -pretty: Print the solved sudoku in a human readable way, otherwise it is printed as a string of numbers, it is user to parse in another program
 
 **Use example**:
@@ -47,7 +46,7 @@ Rust implements bitboards, making it even faster, results using vectors are in [
 P stands for parallel, lower is better
 
   * **GO**     -> 120ms, 141%
-  * **Rust**   -> 54ms, 63%  [80ms]
+  * **Rust**   -> 54ms, 63%  [80ms last recorded score without 128bit bitboards]
   * **Rust P** -> 49ms, 57%  [69ms]
   * **C**      -> 85ms, 100%
   * **Python2** -> 8.9s, 10470%

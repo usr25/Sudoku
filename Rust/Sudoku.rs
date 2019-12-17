@@ -16,6 +16,14 @@ static mut IS_TH: bool = false;
 
 /*--------------------------HELPERS-----------------------------*/
 
+#[inline(always)]
+fn pop_count(n: u32) -> u32 {
+    let y = (n >> 1) & 0o33333333333;
+    let z = n - y - ((y >> 1) & 0o33333333333);
+
+    ((z + (z >> 3)) & 0o30707070707) % 63
+}
+
 fn log2(mut v: Value) -> u8 {
     if v == 0 {
         0
@@ -75,7 +83,8 @@ impl Sudoku {
                     from_s[i] = 1 << (val - 1);
                 }
             }
-            i += 1
+
+            i += 1;
         }
 
         Sudoku {
@@ -87,13 +96,19 @@ impl Sudoku {
         }
     }
 
-    fn solve_from_str(s: &str, pretty: bool) {
+    fn solve_from_str(s: &str, pretty: bool, parallel: bool, print: bool) {
         let mut s = Sudoku::parse(s);
         unsafe {IS_TH = s.is_top_heavy();}
-        s.set_possible();
 
-        let (_, res) = Sudoku::solve(s, SS + 1);
-        println!("{}", res.print_sudoku(pretty));
+        let (_, res) = if parallel {
+            Sudoku::launch_parallel(s)
+        } else {
+            s.set_possible();
+            Sudoku::solve(s, SS+1)
+        };
+        if print {
+            println!("{}", res.print_sudoku(pretty));
+        }
     }
 
     fn print_sudoku(&self, pretty: bool) -> String {
@@ -291,6 +306,50 @@ impl Sudoku {
         true
     }
 
+    fn launch_parallel(mut s: Sudoku) -> (bool, Sudoku) {
+        use std::thread;
+
+        s.set_possible();
+        let is_possible = s.set_all_forced();
+
+        if !is_possible {
+            return (false, s);
+        } else if s.remeaning == 0 {
+            return (true, s);
+        } else {
+            let index =
+            if unsafe {IS_TH} {
+                s.remeaning.trailing_zeros() as usize
+            } else {
+                (127 - s.remeaning.leading_zeros()) as usize
+            };
+            s.remeaning ^= 1u128 << index;
+            let mut possible = s.possible(index);
+            let mut children = Vec::with_capacity(pop_count(possible) as usize);
+
+            while possible != 0 {
+                let val = possible & (!possible + 1);
+                possible &= possible - 1;
+                let mut new_sud = s.clone();
+
+                new_sud.board[index] = val;
+                new_sud.update(index);
+
+                children.push(thread::spawn(move || Sudoku::solve(new_sud, index)));
+            }
+
+            //Collect the results
+            for child in children {
+                let (b, sud) = child.join().unwrap();
+                if b {
+                    return (true, sud);
+                }
+            }
+        }
+
+        (false, s)
+    }
+
     fn solve(mut s: Sudoku, prev: usize) -> (bool, Sudoku) {
         unsafe {NODES += 1;}
 
@@ -298,13 +357,13 @@ impl Sudoku {
             return (true, s);
         }
 
-        let is_pos = if prev >= SS {
+        let is_possible = if prev >= SS {
             s.set_all_forced()
         } else {
             s.set_forced_prev(prev)
         };
 
-        if !is_pos {
+        if !is_possible {
             return (false, s);
         } else if s.remeaning == 0 {
             return (true, s);
@@ -336,14 +395,14 @@ impl Sudoku {
     }
 }
 
-fn read_from_file(path: &str) -> std::io::Result<()> {
+fn read_from_file(path: &str, parallel: bool) -> std::io::Result<()> {
     use std::io::BufRead;
 
     //The sudokus have to be separated with a newline '\n'
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);
     for line in reader.lines() {
-        Sudoku::solve_from_str(&line?, false);
+        Sudoku::solve_from_str(&line?, false, parallel, false);
     }
 
     Ok(())
@@ -374,6 +433,7 @@ const HELP_TXT: &str =
 Usage: ./Sudoku [ARGS] [SUDOKUS]...
 
   -h, --help    Print help
+  -p            Solve using parallelism [Unimplemented]
   -info         Provide information about the difficulty and time
   -pretty       Draw the sudoku in a human readable way
   -bench        Solve the benchmark sudoku, call with -info
@@ -390,6 +450,7 @@ fn main() {
     let args = std::env::args();
     let mut info = false;
     let mut pretty = false;
+    let mut parallel = false;
 
     if args.len() == 1 {
         println!("Type -h for help");
@@ -399,17 +460,20 @@ fn main() {
         match arg.as_ref() {
             "-h" | "--help" => println!("{}", HELP_TXT),
             "-info" => info = true,
+            "-p" => parallel = true,
             "-pretty" => pretty = true,
             "-bench" => Sudoku::solve_from_str(
                 "024000000000007100090000000000000084000075000600030000000400029000200300100000000",
                 pretty,
+                parallel,
+                true,
             ),
 
             a => {
-                if &a[..3] == "--/" {
-                    let _ = read_from_file(&a[2..]);
+                if a.chars().next().unwrap() == '/' {
+                    let _ = read_from_file(&a, parallel);
                 } else if a.len() == SS {
-                    Sudoku::solve_from_str(a, pretty);
+                    Sudoku::solve_from_str(a, pretty, parallel, true);
                 } else if !a.contains("Sudoku") {
                     println!(
                         "\'{}\' is an unknown command, type -h to see all commands",
