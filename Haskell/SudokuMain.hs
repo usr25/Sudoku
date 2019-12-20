@@ -1,7 +1,9 @@
 module Main where
 
+import System.Environment
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Data.Maybe (fromJust)
+import Control.Parallel (par, pseq)
 
 import Data.Bits
 import Data.Array.Unboxed
@@ -52,10 +54,31 @@ vals_impossible = --It should return sudokuEMPTY and False when checked with isV
         [0, 0, 0,  2, 0, 0,  3, 0, 0],
         [0, 0, 0,  0, 0, 0,  0, 0, 0]]
 
+solveParallel :: Sudoku -> (Sudoku, Bool)
+solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
+    where 
+        setAll :: Sudoku
+        setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
+
+        ((rowCounter, colCounter):newRem) = rest
+        possible :: Value
+        possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+
+        parFall :: [Sudoku] -> (Sudoku, Bool)
+        parFall (sudo:sudos) = pair `par` (next `pseq` (if snd pair then pair else next))
+            where
+                next = parFall sudos
+                pair = solveRecursively sudo
+
+        parFall _ = (sudokuEMPTY, False)
+
 
 main :: IO()
 main = do
-    let r = fst $ solveRecursively $ genSudoku vals_final
+    f <- getArgs
+    let parall = (not $ null f) && (head f `elem` ["p", "parall", "parallel", "threaded"])
+    let solve = if parall then solveParallel else solveRecursively
+    let r = fst $ solve $ genSudoku vals_final
 
     startBool <- getCurrentTime
     putStrLn $ toStr $ r
