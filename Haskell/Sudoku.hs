@@ -1,6 +1,7 @@
 module Sudoku where
 
 import Data.Char (chr)
+import Data.List (transpose)
 
 import Data.Array.Unboxed
 import Data.Bits
@@ -61,34 +62,25 @@ prettify (x:xs) = val : ' ' : prettify xs
 prettify _ = ['\n']
 
 toStr :: Sudoku -> String
-toStr (Sudoku val _ _ _ _) = foldl (join) "" val
-    where
-        join :: String -> [Value] -> String
-        join str v = str ++ prettify v
-
+toStr (Sudoku val _ _ _ _) = foldl (\acc v -> acc ++ prettify v) "" val
 
 orArray :: [Value] -> Value
 {-# INLINE orArray #-}
-orArray = foldl (.|.) 0
+orArray = foldl1 (.|.)
 
 andArray :: [Value] -> Value
 {-# INLINE andArray #-}
-andArray = foldl (.&.) constALL
+andArray = foldl1 (.&.)
 
 --bitwise and & 3 values
 and3 :: Value -> Value -> Value -> Value
 {-# INLINE and3 #-}
-and3 a b c = (.&.) a ((.&.) b c)
+and3 a b c = (.&.) a $ (.&.) b c
 
 --bitwise or | 3 values
 or3 :: Value -> Value -> Value -> Value
 {-# INLINE or3 #-}
-or3 a b c = (.|.) a ((.|.) b c)
-
---Generate the possible values in each row
-genRows :: [[Value]] -> [Value]
-genRows (x:xs) = xor constALL (orArray x) : genRows xs
-genRows _ = []
+or3 a b c = (.|.) a $ (.|.) b c
 
 --Adds up all the values in a row and ensures they equal constALL
 sumRows :: [[Value]] -> Bool
@@ -113,6 +105,11 @@ isValid (Sudoku vs _ _ _ _) = sumRows vs && sumCols vs && (sum (sumSquares vs)) 
         sumRecurs (x1:x2:x3:xss) (y1:y2:y3:yss) (z1:z2:z3:zss) = x1 + x2 + x3 + y1 + y2 + y3 + z1 + z2 + z3 + sumRecurs xss yss zss
         sumRecurs _ _ _ = 0
 
+--Generate the possible values in each row
+genRows :: [[Value]] -> [Value]
+genRows (x:xs) = xor constALL (orArray x) : genRows xs
+genRows _ = []
+
 --Generate the possible values in each col
 genCols :: [[Value]] -> [Value]
 {-# INLINE genCols #-}
@@ -126,12 +123,6 @@ genSqrs (x:y:z:ls) = helper x y z ++ genSqrs ls
         helper (x0:x1:x2:xs) (y0:y1:y2:ys) (z0:z1:z2:zs) = xor constALL (or3 (or3 x0 x1 x2) (or3 y0 y1 y2) (or3 z0 z1 z2)) : helper xs ys zs
         helper _ _ _ = []
 genSqrs _ = []
-
---Transposes a 2d list. Pretty much the same function from Prelude, optimised a bit
-transpose :: [[Value]] -> [[Value]]
-transpose ((x:xs) : xss) = (x : [h | (h:_) <- xss]) : transpose (xs : [t | (_:t) <- xss])
-transpose (_: xss)   = transpose xss
-transpose _ = []
 
 --Returns a list of tuples with the coords (row, col) of all the 0s
 getZeroes :: [[Value]] -> Int -> [(Int, Int)]
@@ -194,10 +185,12 @@ isolSmallBit val = (.&.) val (-val)
 --Changes a value in the position (r, c) in a 2d list
 subIn :: [[Value]] -> Int -> Int -> Value -> [[Value]]
 {-# INLINE subIn #-}
-subIn vs r c val = before ++ (bf ++ val : af) : after
+subIn vs r c val = before ++ new : after
     where
         (before, row:after) = splitAt r vs
-        (bf, _:af) = splitAt c row
+        new = subInOneD row c
+        subInOneD (_:xs) 0 = val : xs
+        subInOneD (x:xs) c = x : subInOneD xs (c-1)
 
 
 --Updates all the values in the board from an array of (r, c, newValue)
@@ -231,15 +224,11 @@ updateVs (v:vs) rest rowCount = if fstRow > rowCount --Checks if it is necessary
 updateVs _ _ _ = []
 
 --Returns False if an empty tile has no possible values
-canBeFinished :: Sudoku -> Bool
-canBeFinished (Sudoku _ rest rows cols sqrs) = helper rest
+cantFinish :: Sudoku -> Bool
+cantFinish (Sudoku _ rest rows cols sqrs) = any isNotPossible rest
     where
-        helper :: [(Int, Int)] -> Bool
-        helper ((rowCounter, colCounter):rems) =
-            if and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter)) == 0
-                then False
-                else helper rems
-        helper _ = True
+        isNotPossible :: (Int, Int) -> Bool
+        isNotPossible (row, col) = 0 == (and3 (rows ! row) (cols ! col) (sqrs ! (getSqrIndex row col)))
 
 --Sets all the forced values for a sudoku. 
 --eg.: The only possible value in a tile is 1, it sets the value as 1 
@@ -286,12 +275,12 @@ fall _ = (sudokuEMPTY, False)
 --In charge of calling setForced / fall in order, starting point of the program
 solveRecursively :: Sudoku -> (Sudoku, Bool)
 solveRecursively sud =
-    if not (canBeFinished setAll)
+    if cantFinish setAll
         then (sudokuEMPTY, False)
         else
             if isFinished setAll
                 then (setAll, True)
-                else fall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
+                else fall $ trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible
     where
         setAll :: Sudoku
         setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
@@ -299,4 +288,3 @@ solveRecursively sud =
         ((rowCounter, colCounter):newRem) = rest
         possible :: Value
         possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
-
