@@ -85,17 +85,3 @@ main = do
     print $ isValid r
     endBool <- getCurrentTime
     putStrLn $ "Took " ++ show (endBool `diffUTCTime` startBool)
-
-{-
-7 2 4  1 6 8  9 3 5  
-8 5 6  3 9 7  1 4 2  
-3 9 1  5 4 2  7 6 8  
-
-9 7 3  6 2 1  5 8 4  
-2 4 8  9 7 5  6 1 3  
-6 1 5  8 3 4  2 9 7  
-
-5 6 7  4 1 3  8 2 9  
-4 8 9  2 5 6  3 7 1  
-1 3 2  7 8 9  4 5 6 
--} 

@@ -20,9 +20,9 @@ $ `python3 Python/sudoku.py #Can also be run with python2`
 
 $ `python3 Python/compiler.py  #Requires Cython, check the` [official website](https://cython.org/)
 0
-$ `cd Haskell && ghc -O2 -optc-O3 SudokuMain.hs && ./SudokuParallel`
+$ `cd Haskell && ghc -O2 -optc-O3 SudokuMain.hs && ./SudokuMain`
 
-$ `cd Haskell && ghc -O2 -optc-O3 -threaded SudokuParallel.hs && ./SudokuParallel +RTS -N<Number of cores> -RTS`
+$ `cd Haskell && ghc -O2 -optc-O3 -threaded SudokuMain.hs && ./SudokuMain p +RTS -N<Number of cores> -RTS` Use p as an argument for parallelism
 
 Go and Rust implementations use command line arguments, use those to solve different sudokus
   * -bench: Solve the hard-coded sudoku, for benchmarking purposes
