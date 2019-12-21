@@ -1,7 +1,7 @@
 module Sudoku where
 
 import Data.Char (chr)
-import Data.List (transpose)
+import Data.List (transpose, intersperse, intercalate)
 
 import Data.Array.Unboxed
 import Data.Bits
@@ -9,33 +9,29 @@ import Data.Bits
 type Value = Int
 type Arr = (UArray Int Value)
 
-data Sudoku = Sudoku [[Value]] [(Int, Int)] Arr Arr Arr
+data Sudoku = Sudoku [Value] [Int] Arr Arr Arr
 
 --Possible improvements:
 --  Use Data.Vectors.Unboxed for the board / remeaning. Probably even worse performance
-
-constR :: Int
-constS :: Int
-constALL :: Int
-sudokuEMPTY :: Sudoku
-
 --genSquares only works for 9x9 sudokus
 
-constR = 3
-constS = 9
-constALL = (shift 1 constS) - 1
+constALL = (shift 1 9) - 1
 sudokuEMPTY = Sudoku [] [] (array (0, 0) []) (array (0, 0) []) (array (0, 0) [])
 
+row :: Int -> Int
+{-# INLINE row #-}
+row i = i `div` 9
+
+col :: Int -> Int
+{-# INLINE col #-}
+col i = i `rem` 9
+
 getSqrIndex :: Int -> Int -> Int
-getSqrIndex row col = constR * (div row constR) + (div col constR)
+getSqrIndex row col = 3 * (div row 3) + (div col 3)
 
-
-{-# INLINE constR #-}
-{-# INLINE constS #-}
-{-# INLINE constALL #-}
-{-# INLINE sudokuEMPTY #-}
-{-# INLINE getSqrIndex #-}
-
+getSqrIndex1 :: Int -> Int
+{-# INLINE getSqrIndex1 #-}
+getSqrIndex1 i = 3 * (div i 27) + (div (col i) 3)
 
 toPow2 :: Value -> Value
 {-# INLINE toPow2 #-}
@@ -44,6 +40,8 @@ toPow2 x = shift 1 (x - 1)
 fromPow2 :: Value -> Value
 fromPow2 x = if x == 0 then 0 else 1 + countTrailingZeros x
 
+toChr :: Value -> Char
+toChr x = chr $ (fromPow2 x) + 48
 
 --Fast, it only checks if there are no values remeaning. If everything works well, there should be no problem
 isFinished :: Sudoku -> Bool
@@ -52,17 +50,18 @@ isFinished (Sudoku _ rem _ _ _) = null rem
 
 --Slower, more reliable version. It checks if any of the tiles is empty (has a 0)
 isFinishedSlow :: Sudoku -> Bool
-isFinishedSlow (Sudoku vs _ _ _ _) = not (or (map (any (==0)) vs))
+isFinishedSlow (Sudoku vs _ _ _ _) = not $ any (==0) vs
 
---Functions in charge of the String representation of the sudoku
-prettify :: [Value] -> String
-prettify (x:xs) = val : ' ' : prettify xs
-    where
-        val = if x == 0 then '-' else chr $ (fromPow2 x) + 48
-prettify _ = ['\n']
+prettify :: String -> String
+prettify str = intercalate "\n" $ map (intersperse ' ' . reverse) $ splitEvery 9 [] str
 
 toStr :: Sudoku -> String
-toStr (Sudoku val _ _ _ _) = foldl (\acc v -> acc ++ prettify v) "" val
+toStr (Sudoku val _ _ _ _) = map toChr val --foldl (\acc v -> acc ++ prettify v) "" to2D
+
+splitEvery :: Int -> [a] -> [a] -> [[a]]
+splitEvery 0 acc xs = acc : splitEvery 9 [] xs
+splitEvery c acc (x:xs) = splitEvery (c-1) (x:acc) xs
+splitEvery _ _ _ = []
 
 orArray :: [Value] -> Value
 {-# INLINE orArray #-}
@@ -82,21 +81,27 @@ or3 :: Value -> Value -> Value -> Value
 {-# INLINE or3 #-}
 or3 a b c = (.|.) a $ (.|.) b c
 
+--Extracts the smallest power of 2 of a value (9 -> 1, 10 -> 2, 192 -> 64)
+isolSmallBit :: Value -> Value
+{-# INLINE isolSmallBit#-}
+isolSmallBit val = (.&.) val (-val)
+
 --Adds up all the values in a row and ensures they equal constALL
 sumRows :: [[Value]] -> Bool
 {-# INLINE sumRows #-}
 sumRows vs = all (==constALL) (map sum vs)
 
 sumCols :: [[Value]] -> Bool
-{-# INLINE sumCols #-}
 sumCols = sumRows . transpose
 
 --TODO: Check if any values are repeated
 --Checks if a sudoku is valid, the addition of all the values in any row / col / sqr == constALL
 isValid :: Sudoku -> Bool
 {-# INLINE isValid #-} 
-isValid (Sudoku vs _ _ _ _) = sumRows vs && sumCols vs && (sum (sumSquares vs)) == constS * constALL 
+isValid (Sudoku vs _ _ _ _) = sumRows twoD && sumCols twoD && all (==constALL*3) (sumSquares twoD)
     where
+        twoD = splitEvery 9 [] vs
+
         sumSquares :: [[Value]] -> [Value]
         sumSquares (l1:l2:l3:ls) = sumRecurs l1 l2 l3 : sumSquares ls
         sumSquares _ = []
@@ -112,7 +117,6 @@ genRows _ = []
 
 --Generate the possible values in each col
 genCols :: [[Value]] -> [Value]
-{-# INLINE genCols #-}
 genCols = genRows . transpose
 
 --Generate the possible values in each sqr
@@ -125,25 +129,24 @@ genSqrs (x:y:z:ls) = helper x y z ++ genSqrs ls
 genSqrs _ = []
 
 --Returns a list of tuples with the coords (row, col) of all the 0s
-getZeroes :: [[Value]] -> Int -> [(Int, Int)]
-getZeroes (v:vs) rowCount = getZeroesRow v 0 ++ getZeroes vs (rowCount+1)
-    where
-        getZeroesRow :: [Value] -> Int -> [(Int, Int)]
-        getZeroesRow (0:vss) colCount = (rowCount, colCount) : getZeroesRow vss (colCount+1)
-        getZeroesRow (_:vss) colCount = getZeroesRow vss (colCount+1)
-        getZeroesRow _ _ = []
+getZeroes :: [Value] -> Int -> [Int]
+getZeroes (x:xs) c = 
+    if x == 0
+        then c : getZeroes xs (c+1)
+        else getZeroes xs (c+1)
 getZeroes _ _ = []
 
 --Translates the representation from a sudoku into a Sudoku data struct.
 --With all the values and possible calculated
 genSudoku :: [[Value]] -> Sudoku
-genSudoku vals = Sudoku arrayPow2 rest newRows newCols newSqrs
+genSudoku vals = Sudoku array rest newRows newCols newSqrs
     where
-        arrayPow2 = map (map toPow2) vals
-        rest = getZeroes arrayPow2 0
-        newRows = listArray (0,constS-1) (genRows arrayPow2)
-        newCols = listArray (0,constS-1) (genCols arrayPow2)
-        newSqrs = listArray (0,constS-1) (genSqrs arrayPow2)
+        arrayPow2D = map (map toPow2) vals
+        array = foldl (++) [] arrayPow2D
+        rest = getZeroes array 0
+        newRows = listArray (0,9-1) (genRows arrayPow2D)
+        newCols = listArray (0,9-1) (genCols arrayPow2D)
+        newSqrs = listArray (0,9-1) (genSqrs arrayPow2D)
 
 --Updates rows / cols / sqrs after one value has been changed
 --PRE: valMask is the mask of the new value xor constALL newVal
@@ -153,82 +156,45 @@ updateRCS valMask rowCount colCount oldR oldC oldS = (newR, newC, newS)
     where
         prevR = oldR ! rowCount
         prevC = oldC ! colCount
-        prevS = oldS ! sqrIndex
+        prevS = oldS ! sqrCount
         updatedR = (.&.) prevR valMask
         updatedC = (.&.) prevC valMask
         updatedS = (.&.) prevS valMask
 
-        newR = listArray (0,constS-1) (bfR ++ updatedR:afR)
-        (bfR, _:afR) = splitAt rowCount (elems oldR)
+        newR = listArray (0,9-1) (subIn (elems oldR) rowCount updatedR)
+        newC = listArray (0,9-1) (subIn (elems oldC) colCount updatedC)
+        newS = listArray (0,9-1) (subIn (elems oldS) sqrCount updatedS)
 
-        newC = listArray (0,constS-1) (bfC ++ updatedC:afC)
-        (bfC, _:afC) = splitAt colCount (elems oldC)
-
-        newS = listArray (0,constS-1) (bfS ++ updatedS:afS)
-        (bfS, _:afS) = splitAt sqrIndex (elems oldS)
-
-        sqrIndex = getSqrIndex rowCount colCount
+        sqrCount = getSqrIndex rowCount colCount
 
 --Regenerates the sudoku after only one tile has been changed
-genSudokuOneChange :: Sudoku -> Value -> Int -> Int -> Sudoku
+genSudokuOneChange :: Sudoku -> Value -> Int -> Sudoku
 {-# INLINE genSudokuOneChange #-}
-genSudokuOneChange (Sudoku oldVs newRem oldR oldC oldS) newVal rowCount colCount = Sudoku newVs newRem newR newC newS
+genSudokuOneChange (Sudoku oldVs newRem oldR oldC oldS) newVal index = Sudoku newVs newRem newR newC newS
     where
-        newVs = subIn oldVs rowCount colCount newVal
-        (newR, newC, newS) = updateRCS (complement newVal) rowCount colCount oldR oldC oldS
+        newVs = subIn oldVs index newVal
+        (newR, newC, newS) = updateRCS (complement newVal) (row index) (col index) oldR oldC oldS
 
---Extracts the smallest power of 2 of a value (9 -> 1, 10 -> 2, 192 -> 64)
-isolSmallBit :: Value -> Value
-{-# INLINE isolSmallBit#-}
-isolSmallBit val = (.&.) val (-val)
+--Changes a value in the given position
+subIn :: [Value] -> Int -> Value -> [Value]
+subIn (_:xs) 0 val = val : xs
+subIn (x:xs) c val = x : subIn xs (c-1) val
 
---Changes a value in the position (r, c) in a 2d list
-subIn :: [[Value]] -> Int -> Int -> Value -> [[Value]]
-{-# INLINE subIn #-}
-subIn vs r c val = before ++ new : after
-    where
-        (before, row:after) = splitAt r vs
-        new = subInOneD row c
-        subInOneD (_:xs) 0 = val : xs
-        subInOneD (x:xs) c = x : subInOneD xs (c-1)
-
-
---Updates all the values in the board from an array of (r, c, newValue)
-updateVs :: [[Value]] -> [(Int, Int, Value)] -> Int -> [[Value]]
+--Updates all the values in the board from an array of (index, newValue)
+updateVs :: [Value] -> [(Int, Value)] -> Int -> [Value]
 updateVs vs [] _ = vs
-updateVs (v:vs) rest rowCount = if fstRow > rowCount --Checks if it is necessary to update any values in this row
-    then
-        v : updateVs vs rest (rowCount+1)
-    else
-        changeInRow v nRow 0 : updateVs vs rest' (rowCount+1)
-    where
-        (fstRow, _, _) = head rest
-        splitWhile :: [(Int, Int, Value)] -> ([(Int, Int, Value)], [(Int, Int, Value)])
-        splitWhile (x@(rC, _, _):xs)
-            | rC == rowCount = (x : a, b)
-            | True = ([], x:xs)
-            where
-                (a, b) = splitWhile xs
-        splitWhile _ = ([], [])
-
-        (nRow, rest') = splitWhile rest
-
-        --Changes all the values in a row
-        --The list of changes contains only the values in the row 
-        changeInRow :: [Value] -> [(Int, Int, Value)] -> Int -> [Value]
-        changeInRow vss [] _ = vss
-        changeInRow (v':vss) rest@((_, colC, val):restRem) colCount
-            | colCount == colC = val : changeInRow vss restRem (colCount+1)
-            | True = v' : changeInRow vss rest (colCount+1)
-        changeInRow _ _ _= []
+updateVs (v:vs) rest@((i,nv):rs) index = 
+    if index == i
+        then nv : updateVs vs rs (index+1)
+        else v : updateVs vs rest (index+1)
 updateVs _ _ _ = []
 
 --Returns False if an empty tile has no possible values
 cantFinish :: Sudoku -> Bool
 cantFinish (Sudoku _ rest rows cols sqrs) = any isNotPossible rest
     where
-        isNotPossible :: (Int, Int) -> Bool
-        isNotPossible (row, col) = 0 == (and3 (rows ! row) (cols ! col) (sqrs ! (getSqrIndex row col)))
+        isNotPossible :: Int -> Bool
+        isNotPossible index = 0 == (and3 (rows ! (row index)) (cols ! (col index)) (sqrs ! (getSqrIndex1 index)))
 
 --Sets all the forced values for a sudoku. 
 --eg.: The only possible value in a tile is 1, it sets the value as 1 
@@ -237,32 +203,32 @@ setForced (Sudoku vs rest rows cols sqrs) = Sudoku (updateVs vs totalChanges 0) 
     where
         (totalChanges, finalRemeaning, finalR, finalC, finalS) = helper rest rows cols sqrs
 
-        helper :: [(Int, Int)] -> Arr -> Arr -> Arr -> ([(Int, Int, Value)], [(Int, Int)], Arr, Arr, Arr)
-        helper (tup@(rowCounter, colCounter):rest) rows cols sqrs =
+        helper :: [Int] -> Arr -> Arr -> Arr -> ([(Int, Value)], [Int], Arr, Arr, Arr)
+        helper (index:rest) rows cols sqrs =
             if pC == 1
-                then ((rowCounter, colCounter, possible):changed', newRem', lastR', lastC', lastS')
-                else (changed, tup:newRem, lastR, lastC, lastS)
+                then ((index, possible):changed', newRem', lastR', lastC', lastS')
+                else (changed, index:newRem, lastR, lastC, lastS)
             where
-                possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+                possible = and3 (rows ! (row index)) (cols ! (col index)) (sqrs ! (getSqrIndex1 index))
                 pC = popCount possible
 
                 (changed, newRem, lastR, lastC, lastS) =  helper rest rows cols sqrs
                 (changed', newRem', lastR', lastC', lastS') =  helper rest newR newC newS
 
-                (newR, newC, newS) = updateRCS (complement possible) rowCounter colCounter rows cols sqrs
+                (newR, newC, newS) = updateRCS (complement possible) (row index) (col index) rows cols sqrs
         helper _ rows cols sqrs = ([], [], rows, cols, sqrs)
 
 --Generates a list with all the Sudokus generated from the possible values in a tile
-trySudokus :: Sudoku -> Int -> Int -> Value -> [Sudoku]
-trySudokus sud rowCounter colCounter val = helper val
+trySudokus :: Sudoku -> Int -> Value -> [Sudoku]
+trySudokus sud index val = helper val
     where
         helper :: Value -> [Sudoku]
         helper val' =
             if val' == 0
                 then []
-                else result : trySudokus sud rowCounter colCounter (xor val getVal)
+                else result : trySudokus sud index (xor val getVal)
             where
-                result = genSudokuOneChange sud getVal rowCounter colCounter
+                result = genSudokuOneChange sud getVal index
                 getVal = isolSmallBit val'
 
 --Performs a DFS on the possible sudokus, until a valid one is found
@@ -280,11 +246,11 @@ solveRecursively sud =
         else
             if isFinished setAll
                 then (setAll, True)
-                else fall $ trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible
+                else fall $ trySudokus (Sudoku vs newRem rows cols sqrs) index possible
     where
         setAll :: Sudoku
         setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
 
-        ((rowCounter, colCounter):newRem) = rest
+        (index:newRem) = rest
         possible :: Value
-        possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+        possible = and3 (rows ! (row index)) (cols ! (col index)) (sqrs ! (getSqrIndex1 index))

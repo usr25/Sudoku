@@ -53,7 +53,7 @@ vals_impossible = --It should return sudokuEMPTY and False when checked with isV
         [0, 3, 5,  4, 6, 7,  8, 2, 9],
         [0, 0, 0,  2, 0, 0,  3, 0, 0],
         [0, 0, 0,  0, 0, 0,  0, 0, 0]]
-
+{-
 solveParallel :: Sudoku -> (Sudoku, Bool)
 solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
     where 
@@ -71,17 +71,19 @@ solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySu
                 pair = solveRecursively sudo
 
         parFall _ = (sudokuEMPTY, False)
-
+-}
 
 main :: IO()
 main = do
     f <- getArgs
-    let parall = (not $ null f) && (head f `elem` ["p", "parall", "parallel", "threaded"])
-    let solve = if parall then solveParallel else solveRecursively
-    let r = fst $ solve $ genSudoku vals_final
+    let parall = (not $ null f) && (head f `elem` ["p", "-p", "-parall", "-parallel", "-threaded"])
+    let solve = if parall then {-solveParallel-} solveRecursively else solveRecursively
+    let r = fst $ solve $ genSudoku vals_final --Because of Haskell's lazyness it gets evaluated later
 
     startBool <- getCurrentTime
-    putStrLn $ toStr $ r
-    print $ isValid r
+    putStrLn $ toStr r
     endBool <- getCurrentTime
+
+    putStrLn $ prettify $ toStr r
+    print $ isValid r
     putStrLn $ "Took " ++ show (endBool `diffUTCTime` startBool)
