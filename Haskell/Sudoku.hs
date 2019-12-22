@@ -14,7 +14,7 @@ data Sudoku = Sudoku [Value] [Int] Vec Vec Vec
 
 --genSquares only works for 9x9 sudokus
 
-constALL = (shift 1 9) - 1
+constALL = 2^9 - 1
 sudokuEMPTY = Sudoku [] [] V.empty V.empty V.empty
 
 row :: Int -> Int
@@ -26,15 +26,15 @@ col :: Int -> Int
 col i = i `rem` 9
 
 getSqrIndex :: Int -> Int -> Int
-getSqrIndex row col = 3 * (div row 3) + (div col 3)
+getSqrIndex row col = 3 * (row `div` 3) + (col `div` 3)
 
 getSqrIndex1 :: Int -> Int
 {-# INLINE getSqrIndex1 #-}
-getSqrIndex1 i = 3 * (div i 27) + (div (col i) 3)
+getSqrIndex1 i = 3 * (i `div` 27) + ((col i) `div` 3)
 
 toPow2 :: Value -> Value
 {-# INLINE toPow2 #-}
-toPow2 x = shift 1 (x - 1)
+toPow2 x = shift 1 (x-1)
 
 fromPow2 :: Value -> Value
 fromPow2 x = if x == 0 then 0 else 1 + countTrailingZeros x
@@ -106,8 +106,12 @@ isValid (Sudoku vs _ _ _ _) = sumRows twoD && sumCols twoD && all (==constALL*3)
         sumSquares _ = []
 
         sumRecurs :: [Value] -> [Value] -> [Value] -> Value
-        sumRecurs (x1:x2:x3:xss) (y1:y2:y3:yss) (z1:z2:z3:zss) = x1 + x2 + x3 + y1 + y2 + y3 + z1 + z2 + z3 + sumRecurs xss yss zss
-        sumRecurs _ _ _ = 0
+        sumRecurs [] [] [] = 0
+        sumRecurs xss yss zss = sum (begX ++ begY ++ begZ) + sumRecurs lstX lstY lstZ
+            where
+                (begX, lstX) = splitAt 3 xss
+                (begY, lstY) = splitAt 3 yss
+                (begZ, lstZ) = splitAt 3 zss
 
 --Generate the possible values in each row
 genRows :: [[Value]] -> [Value]
@@ -123,8 +127,12 @@ genSqrs :: [[Value]] -> [Value]
 genSqrs (x:y:z:ls) = helper x y z ++ genSqrs ls
     where
         helper :: [Value] -> [Value] -> [Value] -> [Value]
-        helper (x0:x1:x2:xs) (y0:y1:y2:ys) (z0:z1:z2:zs) = xor constALL (or3 (or3 x0 x1 x2) (or3 y0 y1 y2) (or3 z0 z1 z2)) : helper xs ys zs
-        helper _ _ _ = []
+        helper [] [] [] = []
+        helper xs ys zs = xor constALL (orArray $ begX ++ begY ++ begZ) : helper lstX lstY lstZ
+            where
+                (begX, lstX) = splitAt 3 xs
+                (begY, lstY) = splitAt 3 ys
+                (begZ, lstZ) = splitAt 3 zs
 genSqrs _ = []
 
 --Returns a list of tuples with the coords (row, col) of all the 0s
@@ -141,7 +149,7 @@ genSudoku :: [[Value]] -> Sudoku
 genSudoku vals = Sudoku array rest newRows newCols newSqrs
     where
         arrayPow2D = map (map toPow2) vals
-        array = foldl (++) [] arrayPow2D
+        array = concat arrayPow2D
         rest = getZeroes array 0
         newRows = V.fromList (genRows arrayPow2D)
         newCols = V.fromList (genCols arrayPow2D)
