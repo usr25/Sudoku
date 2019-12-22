@@ -6,7 +6,7 @@ import Data.Maybe (fromJust)
 import Control.Parallel (par, pseq)
 
 import Data.Bits
-import Data.Array.Unboxed
+import qualified Data.Vector.Unboxed as V
 
 import Sudoku
 
@@ -53,16 +53,16 @@ vals_impossible = --It should return sudokuEMPTY and False when checked with isV
         [0, 3, 5,  4, 6, 7,  8, 2, 9],
         [0, 0, 0,  2, 0, 0,  3, 0, 0],
         [0, 0, 0,  0, 0, 0,  0, 0, 0]]
-{-
+
 solveParallel :: Sudoku -> (Sudoku, Bool)
-solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) rowCounter colCounter possible)
+solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySudokus (Sudoku vs newRem rows cols sqrs) index possible)
     where 
         setAll :: Sudoku
         setAll@(Sudoku vs rest rows cols sqrs) = setForced sud
 
-        ((rowCounter, colCounter):newRem) = rest
+        (index:newRem) = rest
         possible :: Value
-        possible = and3 (rows ! rowCounter) (cols ! colCounter) (sqrs ! (getSqrIndex rowCounter colCounter))
+        possible = and3 (rows V.! (row index)) (cols V.! (col index)) (sqrs V.! (getSqrIndex1 index))
 
         parFall :: [Sudoku] -> (Sudoku, Bool)
         parFall (sudo:sudos) = pair `par` (next `pseq` (if snd pair then pair else next))
@@ -71,13 +71,13 @@ solveParallel sud = if isFinished setAll then (setAll, True) else parFall (trySu
                 pair = solveRecursively sudo
 
         parFall _ = (sudokuEMPTY, False)
--}
+
 
 main :: IO()
 main = do
     f <- getArgs
     let parall = (not $ null f) && (head f `elem` ["p", "-p", "-parall", "-parallel", "-threaded"])
-    let solve = if parall then {-solveParallel-} solveRecursively else solveRecursively
+    let solve = if parall then solveParallel else solveRecursively
     let r = fst $ solve $ genSudoku vals_final --Because of Haskell's lazyness it gets evaluated later
 
     startBool <- getCurrentTime

@@ -3,20 +3,19 @@ module Sudoku where
 import Data.Char (chr)
 import Data.List (transpose, intersperse, intercalate)
 
-import Data.Array.Unboxed
+--An improvement would be to use mutable vectors, but thats too far from haskell
+import qualified Data.Vector.Unboxed as V
 import Data.Bits
 
 type Value = Int
-type Arr = (UArray Int Value)
+type Vec = (V.Vector Value)
 
-data Sudoku = Sudoku [Value] [Int] Arr Arr Arr
+data Sudoku = Sudoku [Value] [Int] Vec Vec Vec
 
---Possible improvements:
---  Use Data.Vectors.Unboxed for the board / remeaning. Probably even worse performance
 --genSquares only works for 9x9 sudokus
 
 constALL = (shift 1 9) - 1
-sudokuEMPTY = Sudoku [] [] (array (0, 0) []) (array (0, 0) []) (array (0, 0) [])
+sudokuEMPTY = Sudoku [] [] V.empty V.empty V.empty
 
 row :: Int -> Int
 {-# INLINE row #-}
@@ -41,7 +40,7 @@ fromPow2 :: Value -> Value
 fromPow2 x = if x == 0 then 0 else 1 + countTrailingZeros x
 
 toChr :: Value -> Char
-toChr x = chr $ (fromPow2 x) + 48
+toChr x = chr $ 48 + fromPow2 x
 
 --Fast, it only checks if there are no values remeaning. If everything works well, there should be no problem
 isFinished :: Sudoku -> Bool
@@ -56,7 +55,7 @@ prettify :: String -> String
 prettify str = intercalate "\n" $ map (intersperse ' ' . reverse) $ splitEvery 9 [] str
 
 toStr :: Sudoku -> String
-toStr (Sudoku val _ _ _ _) = map toChr val --foldl (\acc v -> acc ++ prettify v) "" to2D
+toStr (Sudoku val _ _ _ _) = map toChr val
 
 splitEvery :: Int -> [a] -> [a] -> [[a]]
 splitEvery 0 acc xs = acc : splitEvery 9 [] xs
@@ -144,26 +143,26 @@ genSudoku vals = Sudoku array rest newRows newCols newSqrs
         arrayPow2D = map (map toPow2) vals
         array = foldl (++) [] arrayPow2D
         rest = getZeroes array 0
-        newRows = listArray (0,9-1) (genRows arrayPow2D)
-        newCols = listArray (0,9-1) (genCols arrayPow2D)
-        newSqrs = listArray (0,9-1) (genSqrs arrayPow2D)
+        newRows = V.fromList (genRows arrayPow2D)
+        newCols = V.fromList (genCols arrayPow2D)
+        newSqrs = V.fromList (genSqrs arrayPow2D)
 
 --Updates rows / cols / sqrs after one value has been changed
 --PRE: valMask is the mask of the new value xor constALL newVal
-updateRCS :: Value -> Int -> Int -> Arr -> Arr -> Arr -> (Arr, Arr, Arr)
+updateRCS :: Value -> Int -> Int -> Vec -> Vec -> Vec -> (Vec, Vec, Vec)
 {-# INLINE updateRCS #-}
 updateRCS valMask rowCount colCount oldR oldC oldS = (newR, newC, newS)
     where
-        prevR = oldR ! rowCount
-        prevC = oldC ! colCount
-        prevS = oldS ! sqrCount
+        prevR = oldR V.! rowCount
+        prevC = oldC V.! colCount
+        prevS = oldS V.! sqrCount
         updatedR = (.&.) prevR valMask
         updatedC = (.&.) prevC valMask
         updatedS = (.&.) prevS valMask
 
-        newR = listArray (0,9-1) (subIn (elems oldR) rowCount updatedR)
-        newC = listArray (0,9-1) (subIn (elems oldC) colCount updatedC)
-        newS = listArray (0,9-1) (subIn (elems oldS) sqrCount updatedS)
+        newR = V.update oldR (V.singleton (rowCount, updatedR))
+        newC = V.update oldC (V.singleton (colCount, updatedC))
+        newS = V.update oldS (V.singleton (sqrCount, updatedS))
 
         sqrCount = getSqrIndex rowCount colCount
 
@@ -194,7 +193,7 @@ cantFinish :: Sudoku -> Bool
 cantFinish (Sudoku _ rest rows cols sqrs) = any isNotPossible rest
     where
         isNotPossible :: Int -> Bool
-        isNotPossible index = 0 == (and3 (rows ! (row index)) (cols ! (col index)) (sqrs ! (getSqrIndex1 index)))
+        isNotPossible index = 0 == (and3 (rows V.! (row index)) (cols V.! (col index)) (sqrs V.! (getSqrIndex1 index)))
 
 --Sets all the forced values for a sudoku. 
 --eg.: The only possible value in a tile is 1, it sets the value as 1 
@@ -203,14 +202,13 @@ setForced (Sudoku vs rest rows cols sqrs) = Sudoku (updateVs vs totalChanges 0) 
     where
         (totalChanges, finalRemeaning, finalR, finalC, finalS) = helper rest rows cols sqrs
 
-        helper :: [Int] -> Arr -> Arr -> Arr -> ([(Int, Value)], [Int], Arr, Arr, Arr)
+        helper :: [Int] -> Vec -> Vec -> Vec -> ([(Int, Value)], [Int], Vec, Vec, Vec)
         helper (index:rest) rows cols sqrs =
-            if pC == 1
+            if popCount possible == 1
                 then ((index, possible):changed', newRem', lastR', lastC', lastS')
                 else (changed, index:newRem, lastR, lastC, lastS)
             where
-                possible = and3 (rows ! (row index)) (cols ! (col index)) (sqrs ! (getSqrIndex1 index))
-                pC = popCount possible
+                possible = and3 (rows V.! (row index)) (cols V.! (col index)) (sqrs V.! (getSqrIndex1 index))
 
                 (changed, newRem, lastR, lastC, lastS) =  helper rest rows cols sqrs
                 (changed', newRem', lastR', lastC', lastS') =  helper rest newR newC newS
@@ -253,4 +251,4 @@ solveRecursively sud =
 
         (index:newRem) = rest
         possible :: Value
-        possible = and3 (rows ! (row index)) (cols ! (col index)) (sqrs ! (getSqrIndex1 index))
+        possible = and3 (rows V.! (row index)) (cols V.! (col index)) (sqrs V.! (getSqrIndex1 index))

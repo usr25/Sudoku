@@ -52,8 +52,8 @@ P stands for parallel, lower is better
   * **Python2** -> 8.9s, 10470%
   * **Python3** -> 11.0s, 12940%
   * **Cython** -> 1.2s, 1410%
-  * **Haskell** -> 4.2s, 4940%
-  * **Haskell P** -> 4.0s, 4700%
+  * **Haskell** -> 2.6s, 3058%
+  * **Haskell P** -> 2.5s, 2941%
 
 ### Algorithm
   The possible values for each square are the intersection of the possible values in its row / col / sqr
