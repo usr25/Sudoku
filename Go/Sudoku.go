@@ -285,6 +285,7 @@ func setAllForced(s *Sudoku) bool {
 			if s.board[val] != 0 {
 				continue
 			}
+
 			i, j = coord(val)
 			m = getSqrIndex(i, j)
 			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[m]
@@ -330,21 +331,29 @@ func (self Sudoku) solve() (bool, Sudoku) {
 	}
 
 	var index int
-	if isTH {
-		for i := 0; self.board[index] != 0 && i < counter; i++ {
-			index = remeaning[i]
+
+	//Find the most optimal tile (only 2 possible) or a suboptimal (3 possible)
+	//Wort case: Nothing is found and we will use the one from the first loop
+	for _, i := range remeaning {
+		if self.board[i] != 0 {
+			continue
 		}
-	} else {
-		for i := counter - 1; self.board[index] != 0 && i >= 0; i-- {
-			index = remeaning[i]
+		tempPC := popCount(self.possible(i))
+
+		if tempPC == 2 {
+			index = i
+			break
+		} else if tempPC == 3 {
+			index = i
 		}
 	}
 
-	var allPos Value = self.possible(index)
+	allPos := self.possible(index)
 	for allPos != 0 {
 		val := allPos & (^allPos + 1)
 		allPos &= allPos - 1
-		newS := Sudoku(self) //Duplicates s
+
+		newS := Sudoku(self)
 		newS.board[index] = val
 		updateOne(index, &newS)
 
@@ -369,39 +378,26 @@ func (self Sudoku) solveMain() (Sudoku /*ok*/, bool /*forcedChanges*/, int /*cal
 	}
 
 	//Find the first empty tile in the board
-	var index, i int
-	if isTH {
-		for ; self.board[index] != 0 && i < counter; i++ {
-			index = remeaning[i]
+	var index int
+
+	//Find the most optimal tile (only 2 possible) or a suboptimal (3 possible)
+	//Wort case: Nothing is found and we will use the one from the first loop
+	for _, i := range remeaning {
+		if self.board[i] != 0 {
+			continue
 		}
-	} else {
-		for ; self.board[index] != 0 && i >= 0; i-- {
-			index = remeaning[i]
+		tempPC := popCount(self.possible(i))
+
+		if tempPC == 2 {
+			index = i
+			break
+		} else if tempPC == 3 {
+			index = i
 		}
 	}
 
 	allPos := self.possible(index)
 	pc := popCount(allPos)
-	fst := true
-
-	//Find the most optimal tile (only 2 possible) or a suboptimal (3 possible)
-	//Wort case: Nothing is found and we will use the one from the first loop
-	for ; i < counter; i++ {
-		tempPC := popCount(self.possible(remeaning[i]))
-
-		if tempPC == 2 {
-			index = remeaning[i]
-			allPos = self.possible(index)
-			pc = tempPC
-			break
-		} else if fst && tempPC == 3 {
-			fst = false
-			index = remeaning[i]
-			allPos = self.possible(index)
-			pc = tempPC
-		}
-	}
-
 	ch := make(chan Sudoku, pc)
 	for allPos != 0 {
 		val := allPos & (^allPos + 1)

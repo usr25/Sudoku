@@ -45,7 +45,7 @@ This are measured on my old laptop (2 cores @ 1.33 GHz), solving the 17-clue pro
 Rust implements bitboards, making it even faster, results using vectors are in [brackets]. To use bb a language needs to have support for 128-bit ints.
 P stands for parallel, lower is better
 
-  * **GO**     -> 120ms, 141%
+  * **GO**     -> 81ms, 95%
   * **Rust**   -> 54ms, 63%  [80ms last recorded score without 128bit bitboards]
   * **Rust P** -> 49ms, 57%  [69ms]
   * **C**      -> 85ms, 100%
