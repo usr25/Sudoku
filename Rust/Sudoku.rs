@@ -239,6 +239,26 @@ impl Sudoku {
         }
     }
 
+    fn lowest_branching(&self) -> usize {
+        let mut best = self.remeaning.trailing_zeros() as usize;
+        let mut bb = self.remeaning & (self.remeaning - 1);
+        while bb != 0 {
+            let lsb = bb.trailing_zeros() as usize;
+            let pc = self.possible(lsb);
+
+            if pc == 2 {
+                best = lsb;
+                break;
+            } else if pc == 3 {
+                best = lsb;
+            }
+
+            bb &= bb - 1;
+        }
+
+        best
+    }
+
     fn update(&mut self, index: usize) {
         let (i, j) = coord(index);
         let mask = !self.board[index];
@@ -399,7 +419,10 @@ fn read_from_file(path: &str, parallel: bool) -> std::io::Result<()> {
     use std::io::BufRead;
 
     //The sudokus have to be separated with a newline '\n'
-    let file = std::fs::File::open(path)?;
+    let file = match std::fs::File::open(path) {
+        Err(why) => panic!("Can't open {} : {}", path, why),
+        Ok(file) => file,
+    };
     let reader = std::io::BufReader::new(file);
     for line in reader.lines() {
         Sudoku::solve_from_str(&line?, false, parallel, false);
@@ -433,12 +456,12 @@ const HELP_TXT: &str =
 Usage: ./Sudoku [ARGS] [SUDOKUS]...
 
   -h, --help    Print help
-  -p            Solve using parallelism [Unimplemented]
+  -p            Solve using parallelism
   -info         Provide information about the difficulty and time
   -pretty       Draw the sudoku in a human readable way
   -bench        Solve the benchmark sudoku, call with -info
 
-  --/path       The path to a file separated by sudokus
+  /path         The path to a file of sudokus separated by newlines
 
 Each sudoku has to be a string of 81 numbers, 0s or dots '.' to represent blank tiles 00021..31000";
 
