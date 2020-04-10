@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
+	"bufio"
 	"strconv"
 	"strings"
 	"time"
@@ -37,12 +39,11 @@ type Sudoku struct {
 var EMPTY Sudoku = Sudoku{}
 
 //To count the nodes and changes made
-var forcedChanges int
-var calls int
+var forcedChanges int64
+var nodes int64
 
 var remeaning [SS]int
 var counter int
-var isTH bool
 
 /*---------------------INITIALIZATION------------------------*/
 /* Test sudoku:
@@ -76,8 +77,6 @@ func Parse(s string) (sud Sudoku) {
 		}
 	}
 	counter = temp_counter
-
-	isTH = sud.isTopHeavy()
 
 	return
 }
@@ -116,7 +115,7 @@ func getSqrIndex(i, j int) int {
 	return R * (i / R) + (j / R)
 }
 func isPow2(v Value) bool {
-	return v & (v - 1) == 0
+	return v & (v - 1) == 0 && v != 0
 }
 
 /*---------------------CHECKING------------------------*/
@@ -246,6 +245,7 @@ func setPossible(s *Sudoku) {
 	for i := 0; i < S; i++ {
 		for j := 0; j < S; j++ {
 			val = s.board[index(i, j)]
+
 			tempRows[i] |= val
 			tempCols[j] |= val
 			tempSqrs[getSqrIndex(i, j)] |= val
@@ -269,7 +269,7 @@ func updateOne(index int, s *Sudoku) {
 }
 
 func setAllForced(s *Sudoku) bool {
-	/* Calls set_forced until there are no more forced tiles.
+	/* nodes set_forced until there are no more forced tiles.
 	 * Returns false if the board is unsolvable
 	 */
 	var i, j, m int
@@ -290,8 +290,28 @@ func setAllForced(s *Sudoku) bool {
 			m = getSqrIndex(i, j)
 			available = s.rowsAv[i] & s.colsAv[j] & s.sqrsAv[m]
 
+
 			if available == 0 {
 				return false
+			}
+
+			if !isPow2(available) {
+				for j2 := 0; j2 < S; j2++ {
+					if j2 == j || s.board[index(i, j2)] != 0 {
+						continue
+					}
+
+					available &= ^(s.colsAv[j2] & s.sqrsAv[getSqrIndex(i, j2)])
+				}
+				if !isPow2(available) {
+					for i2 := 0; i2 < S; i2++ {
+						if i2 == i || s.board[index(i2, j)] != 0 {
+							continue
+						}
+
+						available &= ^(s.rowsAv[i2] & s.sqrsAv[getSqrIndex(i2, j)])
+					}
+				}
 			}
 
 			if isPow2(available) {
@@ -320,7 +340,7 @@ func (self Sudoku) solve() (bool, Sudoku) {
 	 * possible in each branch. It is recursive. Returns false, _ if the
 	 * sudoku is invalid
 	 */
-	calls++
+	nodes++
 
 	isPos := setAllForced(&self)
 
@@ -366,15 +386,18 @@ func (self Sudoku) solve() (bool, Sudoku) {
 	return false, EMPTY
 }
 
-func (self Sudoku) solveMain() (Sudoku /*ok*/, bool /*forcedChanges*/, int /*calls*/, int) {
+func (self Sudoku) solveMain(parallel bool) (Sudoku, bool /*valid*/, int64 /*forcedChanges*/, int64 /*nodes*/) {
 
 	setPossible(&self)
 	isPos := setAllForced(&self)
 
+	forcedChanges = 0
+	nodes = 0
+
 	if !isPos {
 		return EMPTY, false, 0, 0
 	} else if self.finished() {
-		return self, true, len(remeaning), 0
+		return self, true, int64(len(remeaning)), 0
 	}
 
 	//Find the first empty tile in the board
@@ -398,6 +421,7 @@ func (self Sudoku) solveMain() (Sudoku /*ok*/, bool /*forcedChanges*/, int /*cal
 
 	allPos := self.possible(index)
 	pc := popCount(allPos)
+
 	ch := make(chan Sudoku, pc)
 	for allPos != 0 {
 		val := allPos & (^allPos + 1)
@@ -407,17 +431,28 @@ func (self Sudoku) solveMain() (Sudoku /*ok*/, bool /*forcedChanges*/, int /*cal
 		newS.board[index] = val
 		updateOne(index, &newS)
 
-		ch <- helper(newS)
+		if parallel {
+			ch <- helper(newS)
+		} else {
+			pos, newS := newS.solve()
+			if pos {
+				close(ch)
+				return newS, true, forcedChanges, nodes
+			}
+		}
 	}
 	close(ch)
 
-	for nxt := range ch {
-		if nxt != EMPTY {
-			ok := nxt.filledTiles() == SS && nxt.verifySudoku()
-			return nxt, ok, forcedChanges, calls
+	if parallel {
+		for nxt := range ch {
+			if nxt != EMPTY {
+				ok := nxt.filledTiles() == SS && nxt.verifySudoku()
+				return nxt, ok, forcedChanges, nodes
+			}
 		}
 	}
-	return EMPTY, false, forcedChanges, calls
+
+	return EMPTY, false, forcedChanges, nodes
 }
 
 func helper(s Sudoku) Sudoku {
@@ -425,62 +460,76 @@ func helper(s Sudoku) Sudoku {
 	return s
 }
 
-func (self Sudoku) isTopHeavy() bool{
-	half := SS / 2
-	bottom := 0
-	top := 0
-	for i := 0; i < SS; i++ {
-		if self.board[i] != 0{
-			if i >= half {
-				bottom++
-			} else {
-				top++
-			}
-		}
-	}
 
-	return top >= bottom
+func solveFile(path string) (int64, int64){
+	buf, err := os.Open(path)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    defer func() {
+        if err = buf.Close(); err != nil {
+            log.Fatal(err)
+        }
+    }()
+
+    fC := int64(0)
+    n := int64(0)
+    snl := bufio.NewScanner(buf)
+    for snl.Scan() {
+    	sud := Parse(snl.Text())
+        _, _, fC_, n_ := sud.solveMain(false)
+    	fC += fC_
+    	n += n_
+    }
+    err = snl.Err()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    return fC, n
 }
 
 func main() {
-	bench := flag.Bool("bench", false, "The default 17 clue sudoku for benchmarking")
+	bench := flag.Bool("bench", false, "The default 17 clue sudoku for simple benchmarking / testing")
 	pretty := flag.Bool("pretty", false, "Draw the result as a pretty sudoku, use if a human is going to read the output")
 	info := flag.Bool("info", false, "Information about the time taken and the nodes")
+	parallel := flag.Bool("p", false, "Try to use multithreading to speed up the algorithm")
 
 	flag.Parse()
 
 	start := time.Now()
 
-	var forcedChanges, calls int
+	var forcedChanges, nodes int64
 
 	if len(os.Args) <= 1 {
 		fmt.Println("Type -h for help")
 	} else if *bench {
 		s := Parse("024000000000007100090000000000000084000075000600030000000400029000200300100000000")
-		s, _, fC_, c_ := s.solveMain()
+		s, _, fC_, n_ := s.solveMain(*parallel)
 		fmt.Println(s.PrintSudoku(*pretty))
 
 		forcedChanges += fC_
-		calls += c_
+		nodes += n_
 	} else {
 		args := os.Args[1:]
-		for i := 0; i < len(args); i++ {
-			if len(args[i]) != SS {
+		for _, path := range args {
+			_, err := os.Stat(path)
+			fmt.Println(path)
+			//We detect the possible files
+			if os.IsNotExist(err) {
 				continue
 			}
-			s := Parse(args[i])
-			setPossible(&s)
-			s, _, fC_, c_ := s.solveMain()
-			fmt.Println(s.PrintSudoku(*pretty))
 
+			fC_, n_ := solveFile(path)
 			forcedChanges += fC_
-			calls += c_
+			nodes += n_
 		}
 	}
 
 	if *info {
 		fmt.Println("\nTotal changes:", forcedChanges)
-		fmt.Println("Total nodes:", calls)
+		fmt.Println("Total nodes:", nodes)
 		fmt.Println("Time:", time.Now().Sub(start))
 	}
 }

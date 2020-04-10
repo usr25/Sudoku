@@ -4,9 +4,9 @@
 
 #define R 3
 #define S 9
-#define ALL (1<<S) - 1
 #define log_2(ll) __builtin_ctz(ll)
 
+const int ALL = (1<<S)-1;
 
 /*TO RUN:
  * Call with cmd
