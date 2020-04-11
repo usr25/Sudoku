@@ -296,7 +296,7 @@ func setAllForced(s *Sudoku) bool {
 			}
 
 			if !isPow2(available) {
-				for j2 := 0; j2 < S; j2++ {
+				for j2 := 0; j2 < S && available != 0; j2++ {
 					if j2 == j || s.board[index(i, j2)] != 0 {
 						continue
 					}
@@ -304,7 +304,7 @@ func setAllForced(s *Sudoku) bool {
 					available &= ^(s.colsAv[j2] & s.sqrsAv[getSqrIndex(i, j2)])
 				}
 				if !isPow2(available) {
-					for i2 := 0; i2 < S; i2++ {
+					for i2 := 0; i2 < S && available != 0; i2++ {
 						if i2 == i || s.board[index(i2, j)] != 0 {
 							continue
 						}
@@ -462,6 +462,7 @@ func helper(s Sudoku) Sudoku {
 
 
 func solveFile(path string) (int64, int64){
+
 	buf, err := os.Open(path)
     if err != nil {
         log.Fatal(err)
@@ -515,8 +516,8 @@ func main() {
 		args := os.Args[1:]
 		for _, path := range args {
 			_, err := os.Stat(path)
-			fmt.Println(path)
-			//We detect the possible files
+
+			//We skip arguments that don't correspond to files
 			if os.IsNotExist(err) {
 				continue
 			}

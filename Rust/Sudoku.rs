@@ -12,7 +12,7 @@ const SS: usize = S_U * S_U;
 static mut NODES: u64 = 0;
 static mut CHANGES: u64 = 0;
 static mut POSSIBLE: [u128; 81] = [0; 81];
-static mut IS_TH: bool = false;
+
 
 /*--------------------------HELPERS-----------------------------*/
 
@@ -38,7 +38,7 @@ fn log2(mut v: Value) -> u8 {
 }
 #[inline(always)]
 fn is_pow_2(v: Value) -> bool {
-    v & (v - 1) == 0
+    v & (v - 1) == 0 && v != 0
 }
 #[inline(always)]
 fn index(i: usize, j: usize) -> usize {
@@ -98,7 +98,6 @@ impl Sudoku {
 
     fn solve_from_str(s: &str, pretty: bool, parallel: bool, print: bool) {
         let mut s = Sudoku::parse(s);
-        unsafe {IS_TH = s.is_top_heavy();}
 
         let (_, res) = if parallel {
             Sudoku::launch_parallel(s)
@@ -213,11 +212,6 @@ impl Sudoku {
         true
     }
 
-    fn is_top_heavy(&self) -> bool {
-        let mask = 0x1ffffffffff;
-        (self.remeaning & mask).count_ones() < (self.remeaning & (mask << 40)).count_ones()
-    }
-
     #[inline(always)]
     fn possible(&self, index: usize) -> Value {
         let i = index / S_U;
@@ -268,48 +262,46 @@ impl Sudoku {
         self.sqrs[get_sqr_index(i, j)] &= mask;
     }
 
-    fn set_forced_prev(&mut self, prev: usize) -> bool {
-        let mut temp = self.remeaning & unsafe {POSSIBLE[prev]};
-        while temp != 0 {
-            let index = temp.trailing_zeros() as usize;
-            temp &= temp - 1;
-            let (i, j) = coord(index);
-            let available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)];
-
-            if available == 0 {
-                return false;
-            }
-            if is_pow_2(available) {
-                self.board[index] = available;
-
-                let mask = !available;
-
-                self.rows[i] &= mask;
-                self.cols[j] &= mask;
-                self.sqrs[get_sqr_index(i, j)] &= mask;
-
-                self.remeaning ^= 1u128 << index;
-                temp |= unsafe {POSSIBLE[index] & self.remeaning};
-                unsafe {CHANGES += 1;}
-            }
-        }
-
-        true
-    }
-
     fn set_all_forced(&mut self) -> bool {
         let mut temp = self.remeaning;
         while temp != 0 {
-            let index = temp.trailing_zeros() as usize;
+            let idx = temp.trailing_zeros() as usize;
             temp &= temp - 1;
-            let (i, j) = coord(index);
-            let available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)];
+            let (i, j) = coord(idx);
+            let mut available = self.rows[i] & self.cols[j] & self.sqrs[get_sqr_index(i, j)];
 
             if available == 0 {
                 return false;
             }
+            if !is_pow_2(available) {
+                for j2 in 0..S {
+                    let j2 = j2 as usize;
+                    if j2 == j || self.board[index(i, j2)] != 0 {
+                        continue;
+                    }
+
+                    available &= !(self.cols[j2] & self.sqrs[get_sqr_index(i, j2)]);
+                    if available == 0 {
+                        break;
+                    }
+                }
+
+                if !is_pow_2(available) && available != 0 {
+                    for i2 in 0..S {
+                        let i2 = i2 as usize;
+                        if i2 == i || self.board[index(i2, j)] != 0 {
+                            continue;
+                        }
+
+                        available &= !(self.rows[i2] & self.sqrs[get_sqr_index(i2, j)]);
+                        if available == 0 {
+                            break;
+                        }
+                    }
+                }
+            }
             if is_pow_2(available) {
-                self.board[index] = available;
+                self.board[idx] = available;
 
                 let mask = !available;
 
@@ -317,8 +309,8 @@ impl Sudoku {
                 self.cols[j] &= mask;
                 self.sqrs[get_sqr_index(i, j)] &= mask;
 
-                self.remeaning ^= 1u128 << index;
-                temp |= unsafe {POSSIBLE[index] & self.remeaning};
+                self.remeaning ^= 1u128 << idx;
+                temp |= unsafe {POSSIBLE[idx] & self.remeaning};
                 unsafe {CHANGES += 1;}
             }
         }
@@ -337,12 +329,7 @@ impl Sudoku {
         } else if s.remeaning == 0 {
             return (true, s);
         } else {
-            let index =
-            if unsafe {IS_TH} {
-                s.remeaning.trailing_zeros() as usize
-            } else {
-                (127 - s.remeaning.leading_zeros()) as usize
-            };
+            let index = s.remeaning.trailing_zeros() as usize;
             s.remeaning ^= 1u128 << index;
             let mut possible = s.possible(index);
             let mut children = Vec::with_capacity(pop_count(possible) as usize);
@@ -377,23 +364,14 @@ impl Sudoku {
             return (true, s);
         }
 
-        let is_possible = if prev >= SS {
-            s.set_all_forced()
-        } else {
-            s.set_forced_prev(prev)
-        };
+        let is_possible = s.set_all_forced();
 
         if !is_possible {
             return (false, s);
         } else if s.remeaning == 0 {
             return (true, s);
         } else {
-            let index =
-            if unsafe {IS_TH} {
-                s.remeaning.trailing_zeros() as usize
-            } else {
-                (127 - s.remeaning.leading_zeros()) as usize
-            };
+            let index = s.remeaning.trailing_zeros() as usize;
             s.remeaning ^= 1u128 << index;
             let mut possible = s.possible(index);
 
@@ -467,6 +445,7 @@ Each sudoku has to be a string of 81 numbers, 0s or dots '.' to represent blank 
 
 fn main() {
     use std::time::Instant;
+
     unsafe {populate_possible()};
     let now = Instant::now();
 
