@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <getopt.h>
+#include <string.h>
+#include <assert.h>
 #include <time.h>
 
 #define R 3
@@ -61,25 +64,52 @@ bool finishedBoard(const Board board);
 const char* defaultSudoku = "024000000000007100090000000000000084000075000600030000000400029000200300100000000";
 
 unsigned int blanks[S*S];
+int beautifyFlag = 0;
+int logFlag = 0;
 
 /*--------------------------BOARD---------------------------*/
 
 void printBoard(Board board) {
-    printf("Board values: \n");
-    printf("---------------------------\n");
+    if (beautifyFlag)
+    {
+        printf("Board values: \n");
+        printf("---------------------------\n");
 
-    for (int i = 0; i < S; i++) {
-        for (int j = 0; j < S; j++) {
-            if (! board.values[i][j]) {
-                printf(" - ");
-            } else {
-                printf(" %d ", log_2(board.values[i][j]) + 1);
+        for (int i = 0; i < S; i++) {
+            for (int j = 0; j < S; j++) {
+                if (! board.values[i][j]) {
+                    printf(" - ");
+                } else {
+                    printf(" %d ", log_2(board.values[i][j]) + 1);
+                }
+            }
+            printf("\n");
+        }
+
+        printf("---------------------------\n");
+    }
+    else
+    {
+        char* c = (char*)malloc((S*S+1)*sizeof(char));
+        c[S*S] = '\0';
+        int ci = 0;
+        if (c == NULL)
+            exit(2);
+        for (int i = 0; i < S; i++) {
+            for (int j = 0; j < S; j++) {
+                if (! board.values[i][j]) {
+                    c[ci] = '0';
+                } else {
+                    c[ci] = '1' + log_2(board.values[i][j]);
+                }
+                ci++;
             }
         }
-        printf("\n");
-    }
+        assert(c[S*S] == '\0');
+        printf("%s\n", c);
 
-    printf("---------------------------\n");
+        free(c);
+    }
 }
 
 /*--------------------------CHECK---------------------------*/
@@ -305,18 +335,177 @@ Board parseSudoku(const char* sudStr)
     return s;
 }
 
-int main(const int argc, char const *argv[])
+void solveFromStr(const char* sudoku)
 {
-    Board b = parseSudoku(defaultSudoku);
-    printBoard(b);
+    Board b = parseSudoku(sudoku);
 
-    time_t start = clock();
     solve(&b);
+
+    printBoard(b);
+    if (logFlag)
+    {
+        printf("Is valid: "); printf((finishedBoard(b)) ? "true\n" : "false\n");
+    }
+}
+
+
+void readMultipleSudokus(FILE* txt)
+{
+    char buffer[S*S+1];
+    char separator[1];
+
+    buffer[S*S] = '\0';
+
+    //We read 1 sudoku and 1 separator at a time
+    while (fread(buffer, sizeof(char), S*S, txt) == S*S)
+    {
+        assert(buffer[S*S] == '\0');
+        solveFromStr(buffer);
+        //Read the separator
+        if (fread(separator, sizeof(char), 1, txt) != 1)
+        {
+            fprintf(stderr, "Ensure that the sudokus take up %d chars and are separated by 1 char that isnt a number or -\n", S*S);
+            exit(4);
+        }
+        //Ooops, the separator is a number, so the sudokus may be in the wrong format
+        //Just in case, exit with an error
+        if (separator[0] == '-' || (separator[0] >= '0' && separator[0] <= '9'))
+        {
+            fprintf(stderr, "Ensure that the sudokus take up %d chars and are separated by 1 char that isnt a number or -\n", S*S);
+            exit(4);   
+        }
+    }
+}
+
+void readFromFile(const char* path)
+{
+    FILE* f = fopen(path, "r");
+
+    if (f == NULL)
+    {
+        fprintf(stderr, "Couldnt open file %s\n", path);
+        exit(5);
+    }
+
+    readMultipleSudokus(f);
+
+    fclose(f);
+}
+
+const char* helpMsg = "Sudoku solver, by default it solves sudokus from stdin"
+                        "\n-h: Help msg"
+                        "\n-b: Beautify, print human-readable sudokus"
+                        "\n-t: Test default sudoku"
+                        "\n-l: Enables log msgs, only fundamental information logged"
+                        "\n-s <sudoku>: Solve given sudoku"
+                        "\n-f <file>: Solve all the sudokus in the file";
+
+int parseArgs(const int argc, char *const argv[])
+{
+    int readFromStdin = 1;
+
+    opterr = 0;
+    //Flags
+    int testDefaultFlag = 0, helpFlag = 0;
+    int option;
+    char* sudoku = NULL;
+    char* file = NULL;
+
+    while((option = getopt(argc, argv, "lhbts:f:")) != -1)
+    {
+        switch(option)
+        {
+            //Help
+            case 'h':
+            helpFlag = 1;
+            break;
+            //Test default sudoku
+            case 't':
+            testDefaultFlag = 1;
+            break;
+            //Beautify
+            case 'b':
+            beautifyFlag = 1;
+            break;
+            //Log
+            case 'l':
+            logFlag = 1;
+            break;
+
+            case 's':
+            sudoku = (char*)malloc(strlen(optarg)*sizeof(char));
+            if (sudoku == NULL) exit(3);
+            strcpy(sudoku, optarg);
+            readFromStdin = 0;
+            break;
+
+            //File to read
+            case 'f':
+            file = (char*)malloc(strlen(optarg)*sizeof(char));
+            if (file == NULL) exit(3);
+            strcpy(file, optarg);
+            readFromStdin = 0;
+            break;
+
+            case '?':
+                if (optopt == 's')
+                    fprintf(stderr, "Option -%c requires a sudoku as str\n", optopt);
+                else if(optopt == 'f')
+                    fprintf(stderr, "Option -%c requires a file path\n", optopt);
+                else
+                    fprintf(stderr, "Unknown option char -%c\n", optopt);
+            break;
+
+            default:
+            break;
+        }
+    }
+
+    if (logFlag)
+    {
+        if (optind < argc)
+            printf("[?] Unused arguments: \n");
+        for (int i = optind; i < argc; ++i)
+            printf("%s\n", argv[optind]);
+    }
+
+    if (helpFlag)
+        printf("%s\n", helpMsg);
+
+    if (testDefaultFlag)
+    {
+        solveFromStr(defaultSudoku);
+        exit(0);
+    }
+
+    if (sudoku)
+    {
+        solveFromStr(sudoku);
+        free(sudoku);
+    }
+
+    if (file)
+    {
+        readFromFile(file);
+        free(file);
+    }
+
+    return readFromStdin;
+}
+
+int main(const int argc, char *const argv[])
+{
+    time_t start = clock();
+
+    const int readFromStdin = parseArgs(argc, argv);
+
+    if (readFromStdin)
+        readMultipleSudokus(stdin);
+
     time_t end = clock();
 
-    printBoard(b);
-    printf("Is valid: "); printf((finishedBoard(b)) ? "true\n" : "false\n");
-    printf("Time: %ldms\n", (end - start)/1000);
+    if (logFlag)
+        printf("Time: %ldms\n", (end - start)/1000);
 
     return 0;
 }
