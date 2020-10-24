@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
 
@@ -6,7 +7,7 @@
 #define S 9
 #define log_2(ll) __builtin_ctz(ll)
 
-const int ALL = (1<<S)-1;
+const unsigned int ALL = (1<<S)-1;
 
 /*TO RUN:
  * Call with cmd
@@ -17,11 +18,12 @@ const int ALL = (1<<S)-1;
 /*--------------------------INLINES--------------------------*/
 
 static inline int POS(int x) { return 1 << (x-1); }
-static inline int POW2(char pow) { return 1 << pow; }
+static inline int POW2(int pow) { return 1 << pow; }
 static inline int GET_SQR(int i, int j) { return R * (int)(i/R) + (int)(j/R); }
 static inline int GET_X(unsigned short c) { return (c) & 0xf; }
 static inline int GET_Y(unsigned short c) { return ((c) & 0xf0) >> 4; }
 static inline int GET_CRD(int i, int j) { return (i << 4) + j; }
+static inline int IS_POW_2(int p) { return p && ((p & (p-1)) == 0); }
 
 /*------------------------PROTOTYPES------------------------*/
 
@@ -31,6 +33,8 @@ typedef struct {
     unsigned int rowsPos[S];
     unsigned int colsPos[S];
     unsigned int sqrsPos[S];
+
+    unsigned int blanksSize;
 } Board;
 
 Board generateSudoku();
@@ -39,58 +43,26 @@ void printBoard(Board board);
 void solve(Board *board);
 
 bool dfs(Board *board, int index);
-char setAllForced(Board *board, int min);
+int setAllForced(Board *board, int min);
 
 void calculatePossible(Board *board);
-void updateTileAdded(Board *board, const char y, const char x);
+void updateTileAdded(Board *board, const int y, const int x);
 
-int getNextPossibleValue(Board board, const int val, const char x, const char y);
+int getNextPossibleValue(Board board, const int val, const int x, const int y);
 
 int log_2(int index);
 
-bool checkBoard(Board board);
-bool completeBoard(Board board);
-bool finishedBoard(Board board);
+bool checkBoard(const Board board);
+bool completeBoard(const Board board);
+bool finishedBoard(const Board board);
 
 /*--------------------------GLOBAL--------------------------*/
 
+const char* defaultSudoku = "024000000000007100090000000000000084000075000600030000000400029000200300100000000";
+
 unsigned int blanks[S*S];
-int blanks_size = 0;
 
 /*--------------------------BOARD---------------------------*/
-Board generateSudoku(){
-    unsigned int values[S][S] = {
-        {0,2,4, 0,0,0, 0,0,0},
-        {0,0,0, 0,0,7, 1,0,0},
-        {0,9,0, 0,0,0, 0,0,0},
-
-        {0,0,0, 0,0,0, 0,8,4},
-        {0,0,0, 0,7,5, 0,0,0},
-        {6,0,0, 0,3,0, 0,0,0},
-
-        {0,0,0, 4,0,0, 0,2,9},
-        {0,0,0, 2,0,0, 3,0,0},
-        {1,0,0, 0,0,0, 0,0,0}
-    };
-    
-    Board board = (Board) {
-        .rowsPos = {0},
-        .colsPos = {0},
-        .sqrsPos = {0}
-    };
-    
-    for (int i = 0; i < S; i++) {
-        for (int j = 0; j < S; j++) {
-            if (! values[i][j]){
-                blanks[blanks_size++] = GET_CRD(i, j);
-            }else{
-                board.values[i][j] = POS(values[i][j]);
-            }
-        }
-    }
-
-    return board;
-}
 
 void printBoard(Board board) {
     printf("Board values: \n");
@@ -112,7 +84,7 @@ void printBoard(Board board) {
 
 /*--------------------------CHECK---------------------------*/
 
-bool checkBoard(Board board) {
+bool checkBoard(const Board board) {
     int pos, row, col, sqr;
 
     // Checks to see if all rows match
@@ -158,7 +130,7 @@ bool checkBoard(Board board) {
     return true;
 }
 
-bool completeBoard(Board board) {
+bool completeBoard(const Board board) {
     for (int i = 0; i < S; i++) {
         for (int j = 0; j < S; j++) {
             if (board.values[i][j] < 1 || board.values[i][j] >= ALL) return false;
@@ -168,7 +140,7 @@ bool completeBoard(Board board) {
     return true;
 }
 
-bool finishedBoard(Board board) {
+bool finishedBoard(const Board board) {
     return completeBoard(board) && checkBoard(board);
 }
 
@@ -248,8 +220,8 @@ void calculatePossible(Board *board) {
 /* Updates the possible values for the row, column, and square of the 
  * tile that was changed.
  */
-inline void updateTileAdded(Board *board, const char y, const char x) {
-    int mask = ~board->values[y][x];
+inline void updateTileAdded(Board *board, const int y, const int x) {
+    const int mask = ~board->values[y][x];
 
     board->rowsPos[y] &= mask;
     board->colsPos[x] &= mask;
@@ -263,10 +235,10 @@ inline void updateTileAdded(Board *board, const char y, const char x) {
  *  2 if there is an empty tile with no possible value
  *  any other value if no modifications were made
  */
-char setAllForced(Board *board, int max) {
+int setAllForced(Board *board, int max) {
     int x, y;
     int possible;
-    char state = 0;
+    int state = 0;
 
     for (int i = max; state != 2 && i >= 0; i--) {
         x = GET_X(blanks[i]);
@@ -293,9 +265,49 @@ void solve(Board *board) {
 }
 
 
-int main(int argc, char const *argv[])
+Board parseSudoku(const char* sudStr)
 {
-    Board b = generateSudoku();
+    Board s = (Board){
+        .rowsPos = {0},
+        .colsPos = {0},
+        .sqrsPos = {0},
+        .blanksSize = 0
+    };
+
+    int i = 0, val, x,y;
+    char curr;
+
+    while ((curr = sudStr[i]) != '\0')
+    {
+        if (curr == ' ') continue;
+        if (curr == '-') curr = '0';
+
+        val = (int)(curr - '0');
+        if (val < 0 || val > 9)
+        {
+            printf("[-] Unknown char: %c\n", curr);
+            exit(1);
+        }
+
+        x = i % S;
+        y = i / S;
+
+        if (! val){
+            blanks[s.blanksSize++] = GET_CRD(y, x);
+            s.values[y][x] = 0;
+        }else{
+            s.values[y][x] = POS(val);
+        }
+
+        i++;
+    }
+
+    return s;
+}
+
+int main(const int argc, char const *argv[])
+{
+    Board b = parseSudoku(defaultSudoku);
     printBoard(b);
 
     time_t start = clock();
