@@ -61,7 +61,7 @@ bool finishedBoard(const Board board);
 
 /*--------------------------GLOBAL--------------------------*/
 
-const char* defaultSudoku = "024000000000007100090000000000000084000075000600030000000400029000200300100000000";
+const char defaultSudoku[S*S+1] = "024000000000007100090000000000000084000075000600030000000400029000200300100000000";
 
 unsigned int blanks[S*S];
 int beautifyFlag = 0;
@@ -307,7 +307,7 @@ Board parseSudoku(const char* sudStr)
     int i = 0, val, x,y;
     char curr;
 
-    while ((curr = sudStr[i]) != '\0')
+    while (i < S*S && ((curr = sudStr[i]) != '\0'))
     {
         if (curr == ' ') continue;
         if (curr == '-') curr = '0';
@@ -330,6 +330,12 @@ Board parseSudoku(const char* sudStr)
         }
 
         i++;
+    }
+
+    if (i < S*S)
+    {
+        fprintf(stderr, "\'%s\' is less than %d chars long\n", sudStr, S*S);
+        exit(1);
     }
 
     return s;
@@ -397,7 +403,6 @@ const char* helpMsg = "Sudoku solver, by default it solves sudokus from stdin"
                         "\n-b: Beautify, print human-readable sudokus"
                         "\n-t: Test default sudoku"
                         "\n-l: Enables log msgs, only fundamental information logged"
-                        "\n-s <sudoku>: Solve given sudoku"
                         "\n-f <file>: Solve all the sudokus in the file";
 
 int parseArgs(const int argc, char *const argv[])
@@ -408,10 +413,9 @@ int parseArgs(const int argc, char *const argv[])
     //Flags
     int testDefaultFlag = 0, helpFlag = 0;
     int option;
-    char* sudoku = NULL;
     char* file = NULL;
 
-    while((option = getopt(argc, argv, "lhbts:f:")) != -1)
+    while((option = getopt(argc, argv, "lhbtf:")) != -1)
     {
         switch(option)
         {
@@ -422,6 +426,7 @@ int parseArgs(const int argc, char *const argv[])
             //Test default sudoku
             case 't':
             testDefaultFlag = 1;
+            readFromStdin = 0;
             break;
             //Beautify
             case 'b':
@@ -430,13 +435,6 @@ int parseArgs(const int argc, char *const argv[])
             //Log
             case 'l':
             logFlag = 1;
-            break;
-
-            case 's':
-            sudoku = (char*)malloc(strlen(optarg)*sizeof(char));
-            if (sudoku == NULL) exit(3);
-            strcpy(sudoku, optarg);
-            readFromStdin = 0;
             break;
 
             //File to read
@@ -448,9 +446,7 @@ int parseArgs(const int argc, char *const argv[])
             break;
 
             case '?':
-                if (optopt == 's')
-                    fprintf(stderr, "Option -%c requires a sudoku as str\n", optopt);
-                else if(optopt == 'f')
+                if(optopt == 'f')
                     fprintf(stderr, "Option -%c requires a file path\n", optopt);
                 else
                     fprintf(stderr, "Unknown option char -%c\n", optopt);
@@ -461,12 +457,11 @@ int parseArgs(const int argc, char *const argv[])
         }
     }
 
-    if (logFlag)
+    //Unused arguments will be considered sudokus
+    for (int i = optind; i < argc; ++i)
     {
-        if (optind < argc)
-            printf("[?] Unused arguments: \n");
-        for (int i = optind; i < argc; ++i)
-            printf("%s\n", argv[optind]);
+        readFromStdin = 0;
+        solveFromStr(argv[i]);
     }
 
     if (helpFlag)
@@ -474,14 +469,12 @@ int parseArgs(const int argc, char *const argv[])
 
     if (testDefaultFlag)
     {
+        time_t start = clock();
         solveFromStr(defaultSudoku);
-        exit(0);
-    }
+        time_t end = clock();
 
-    if (sudoku)
-    {
-        solveFromStr(sudoku);
-        free(sudoku);
+        printf("Time: %ldms\n", (end - start)/1000);
+        exit(0);
     }
 
     if (file)
